@@ -2,39 +2,32 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-  <title>Macros</title>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Macros">
-  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9IiMwODA4MDgiLz48dGV4dCB4PSIyNTYiIHk9IjM0MCIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5NPC90ZXh0Pjwvc3ZnPg==">
-  
-  <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css">
+  <meta name="theme-color" content="#080808">
+  <meta name="description" content="Suivi nutritionnel personnel">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="stylesheet" href="style.css">
+
+  <title>Mes Macros</title>
 </head>
 <body>
-
   <div id="app"></div>
+  <nav id="nav"></nav>
 
-  <nav id="bottom-nav">
-    <div class="nav-item active" onclick="app.navigate('today')">⬤</div>
-    <div class="nav-item" onclick="app.navigate('history')">◷</div>
-    <div class="nav-item" onclick="app.navigate('foods')">◈</div>
-    <div class="nav-item" onclick="app.navigate('settings')">◎</div>
-  </nav>
-
-  <div id="modal" class="modal-overlay" onclick="if(event.target===this) app.closeModal()">
-    <div class="modal-content">
-      <div class="handle"></div>
-      <div id="modal-body"></div>
-    </div>
-  </div>
-
-  <script src="./app.js"></script>
+  <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(console.error);
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .catch(err => console.warn('SW registration failed:', err));
+      });
     }
   </script>
 </body>

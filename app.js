@@ -1,306 +1,1270 @@
-class MacrosApp {
-  constructor() {
-    this.initData();
-    this.currentDate = new Date().toISOString().split('T')[0];
-    this.activeTab = 'today';
-    this.render();
+// ============================================================
+// app.js — Mes Macros PWA
+// Vanilla JS ES6+, zero dependencies, localStorage only
+// ============================================================
+
+// ── Defaults ────────────────────────────────────────────────
+
+const DEFAULT_GOALS = {
+  sport: { kcal: 2500, p: 180, g: 250, l: 70 },
+  rest:  { kcal: 1850, p: 160, g: 180, l: 60 }
+};
+
+// ── State ────────────────────────────────────────────────────
+
+let S = {
+  tab:         'today',
+  viewDate:    '',           // date shown in today tab
+  histSub:     'list',       // 'list' | 'edit'
+  editDate:    null,         // date being edited in history
+  modal:       null,         // null | 'addFood' | 'editEntry' | 'addFoodDB' | 'editFoodDB'
+  md:          {},           // modal context data
+  searchQ:     '',           // food search in modal
+  foodsSearch: '',           // food search in foods tab
+  settingsEdit: null,        // null | 'sport' | 'rest'
+  settingsTemp: {},
+  days:        {},
+  foods:       [],
+  goals:       {}
+};
+
+// ── Storage ──────────────────────────────────────────────────
+
+function load() {
+  S.days  = JSON.parse(localStorage.getItem('macros_days')  || '{}');
+  S.foods = JSON.parse(localStorage.getItem('macros_foods') || '[]');
+  S.goals = JSON.parse(localStorage.getItem('macros_goals') || JSON.stringify(DEFAULT_GOALS));
+  // Ensure goals have both types
+  if (!S.goals.sport) S.goals.sport = { ...DEFAULT_GOALS.sport };
+  if (!S.goals.rest)  S.goals.rest  = { ...DEFAULT_GOALS.rest  };
+}
+
+function save() {
+  localStorage.setItem('macros_days',  JSON.stringify(S.days));
+  localStorage.setItem('macros_foods', JSON.stringify(S.foods));
+  localStorage.setItem('macros_goals', JSON.stringify(S.goals));
+}
+
+// ── Date Helpers ─────────────────────────────────────────────
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function tomorrowStr() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+function fmtDate(ds) {
+  const d = new Date(ds + 'T12:00:00');
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+function fmtDateShort(ds) {
+  const d = new Date(ds + 'T12:00:00');
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+// ── Data Helpers ─────────────────────────────────────────────
+
+function getDay(date) {
+  if (!S.days[date]) {
+    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] } };
+    save();
   }
-
-  initData() {
-    const defaultGoals = {
-      sport: { kcal: 2500, p: 160, c: 250, f: 80 },
-      rest: { kcal: 2000, p: 150, c: 120, f: 70 }
-    };
-    this.goals = JSON.parse(localStorage.getItem('macros_goals')) || defaultGoals;
-    this.foods = JSON.parse(localStorage.getItem('macros_foods')) || [];
-    this.days = JSON.parse(localStorage.getItem('macros_days')) || {};
+  // Ensure all 6 meals exist (migration safety)
+  for (let m = 1; m <= 6; m++) {
+    if (!S.days[date].meals[m]) S.days[date].meals[m] = [];
   }
+  return S.days[date];
+}
 
-  save() {
-    localStorage.setItem('macros_goals', JSON.stringify(this.goals));
-    localStorage.setItem('macros_foods', JSON.stringify(this.foods));
-    localStorage.setItem('macros_days', JSON.stringify(this.days));
+function allEntries(day) {
+  return [1, 2, 3, 4, 5, 6].flatMap(m => day.meals[m] || []);
+}
+
+function calcMacros(entries) {
+  const t = { kcal: 0, p: 0, g: 0, l: 0 };
+  for (const e of entries) {
+    const f = S.foods.find(x => x.id === e.foodId);
+    if (!f) continue;
+    const r = e.grams / 100;
+    t.kcal += f.kcal * r;
+    t.p    += f.p    * r;
+    t.g    += f.g    * r;
+    t.l    += f.l    * r;
   }
+  return {
+    kcal: Math.round(t.kcal),
+    p: +t.p.toFixed(1),
+    g: +t.g.toFixed(1),
+    l: +t.l.toFixed(1)
+  };
+}
 
-  getDay(date) {
-    if (!this.days[date]) {
-      this.days[date] = { type: 'sport', meals: [[],[],[],[],[],[]] };
-      this.save();
-    }
-    return this.days[date];
-  }
+function uid() {
+  return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+}
 
-  navigate(tab) {
-    this.activeTab = tab;
-    document.querySelectorAll('.nav-item').forEach((el, idx) => {
-      el.classList.toggle('active', ['today','history','foods','settings'].indexOf(tab) === idx);
-    });
-    this.render();
-  }
+function clamp(v, min, max) {
+  return Math.min(Math.max(v, min), max);
+}
 
-  /* --- RENDERS --- */
-  render() {
-    const root = document.getElementById('app');
-    if (this.activeTab === 'today') root.innerHTML = this.renderDayView(this.currentDate);
-    else if (this.activeTab === 'history') root.innerHTML = this.renderHistory();
-    else if (this.activeTab === 'foods') root.innerHTML = this.renderFoods();
-    else if (this.activeTab === 'settings') root.innerHTML = this.renderSettings();
-  }
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-  renderDayView(date) {
-    const day = this.getDay(date);
-    const goals = this.goals[day.type];
-    
-    // Calculate totals
-    let tKcal = 0, tP = 0, tC = 0, tF = 0;
-    day.meals.flat().forEach(entry => {
-      const ratio = entry.amount / 100;
-      tKcal += entry.food.kcal * ratio;
-      tP += entry.food.p * ratio; tC += entry.food.c * ratio; tF += entry.food.f * ratio;
-    });
+// ── SVG Ring ─────────────────────────────────────────────────
 
-    const isToday = date === this.currentDate;
-    const tomorrow = new Date(new Date(date).getTime() + 86400000).toISOString().split('T')[0];
+function renderRing(consumed, goal) {
+  const r = 54, cx = 80, cy = 80, size = 160;
+  const circ = 2 * Math.PI * r;
+  const pct = goal > 0 ? clamp(consumed / goal, 0, 1) : 0;
+  const offset = circ * (1 - pct);
+  const over = consumed > goal;
+  const color = over ? '#e87070' : '#c8d8f0';
+  return `
+  <svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="10"
+      stroke-linecap="round"
+      stroke-dasharray="${circ.toFixed(2)}"
+      stroke-dashoffset="${offset.toFixed(2)}"
+      transform="rotate(-90 ${cx} ${cy})"
+      class="ring-fill"/>
+    <text x="${cx}" y="${cy - 8}" text-anchor="middle" class="ring-val">${consumed}</text>
+    <text x="${cx}" y="${cy + 16}" text-anchor="middle" class="ring-sub">/ ${goal} kcal</text>
+  </svg>`;
+}
 
-    let mealsHtml = '';
-    for(let i=0; i<6; i++) {
-      let itemsHtml = day.meals[i].map((entry, idx) => `
-        <div class="meal-item" onclick="app.openEditEntry('${date}', ${i}, ${idx})">
-          <div>${entry.food.name} <span style="color:#888;font-size:12px">${entry.amount}g</span></div>
-          <div>${Math.round((entry.food.kcal * entry.amount)/100)} kcal</div>
-        </div>
-      `).join('');
-      mealsHtml += `
-        <div class="meal-section">
-          <div class="meal-header">
-            <h3>Repas ${i+1}</h3>
-            <button class="btn" style="padding: 6px 12px; font-size: 14px;" onclick="app.openAddFood('${date}', ${i})">+ Ajouter</button>
-          </div>
-          ${itemsHtml}
-        </div>
-      `;
-    }
+function renderBar(label, consumed, goal, color) {
+  const pct = goal > 0 ? clamp(consumed / goal * 100, 0, 100) : 0;
+  const over = consumed > goal;
+  const c = over ? '#e87070' : color;
+  return `
+  <div class="bar-row">
+    <span class="bar-label">${label}</span>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
+    <span class="bar-num" style="color:${c}">${consumed}g</span>
+  </div>`;
+}
 
-    const pct = Math.min((tKcal / goals.kcal) * 100, 100);
-    const strokeDash = 251.2; // 2 * pi * 40
-    const offset = strokeDash - (pct / 100) * strokeDash;
+function renderPill(label, val, goal, color) {
+  const rem = goal - val;
+  const over = rem < 0;
+  const display = over ? `+${Math.abs(Math.round(rem))}g` : `${Math.round(rem)}g`;
+  return `<span class="pill ${over ? 'pill-over' : ''}" style="--c:${color}">${label} ${display}</span>`;
+}
 
-    return `
-      <header>
-        <h1>${isToday ? "Aujourd'hui" : date}</h1>
-        <div class="badge ${day.type}" onclick="app.toggleDayType('${date}')">${day.type === 'sport' ? 'Sport ⚡' : 'Repos'}</div>
-      </header>
-      
-      <div class="card">
-        <div class="ring-container">
-          <svg width="120" height="120" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#333" stroke-width="10"/>
-            <circle cx="50" cy="50" r="40" fill="none" stroke="white" stroke-width="10" 
-                    stroke-dasharray="${strokeDash}" stroke-dashoffset="${offset}" 
-                    stroke-linecap="round" style="transition: 0.5s; transform: rotate(-90deg); transform-origin: 50% 50%;"/>
-          </svg>
-          <div class="ring-text">
-            <div>${Math.round(tKcal)}</div>
-            <span>/ ${goals.kcal}</span>
-          </div>
-        </div>
+// ── Tab: Day View (Today & History edit) ─────────────────────
 
-        <div class="macro-bars">
-          ${this.renderMacroBar('Protéines', tP, goals.p, 'var(--p)')}
-          ${this.renderMacroBar('Glucides', tC, goals.c, 'var(--c)')}
-          ${this.renderMacroBar('Lipides', tF, goals.f, 'var(--f)')}
-        </div>
-        
-        <div style="display:flex; gap:10px; margin-top:20px;">
-          <div class="pill ${goals.p - tP < 0 ? 'over' : ''}" style="flex:1">${Math.round(goals.p - tP)}g P</div>
-          <div class="pill ${goals.c - tC < 0 ? 'over' : ''}" style="flex:1">${Math.round(goals.c - tC)}g G</div>
-          <div class="pill ${goals.f - tF < 0 ? 'over' : ''}" style="flex:1">${Math.round(goals.f - tF)}g L</div>
-        </div>
+function renderDayView(date) {
+  const isToday    = date === todayStr();
+  const isTomorrow = date === tomorrowStr();
+  const day        = getDay(date);
+  const goals      = S.goals[day.type];
+  const totals     = calcMacros(allEntries(day));
+
+  const badge = day.type === 'sport'
+    ? `<span class="badge-sport">Sport ⚡</span>`
+    : `<span class="badge-rest">Repos 🌙</span>`;
+
+  const header = isToday
+    ? `<div class="day-header">
+         <h2>${fmtDate(date)}</h2>
+         <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
+       </div>`
+    : `<div class="day-header">
+         <button class="btn-back" data-action="back">← Retour</button>
+         <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
+       </div>
+       <h2 class="day-title">${isTomorrow ? 'Demain — ' : ''}${fmtDate(date)}</h2>`;
+
+  const overAlert = (totals.kcal > goals.kcal || totals.p > goals.p || totals.g > goals.g || totals.l > goals.l)
+    ? `<div class="over-alert">⚠️ Un ou plusieurs objectifs sont dépassés</div>` : '';
+
+  const summary = `
+  <div class="summary-card">
+    ${renderRing(totals.kcal, goals.kcal)}
+    <div class="macros-detail">
+      ${renderBar('Protéines', totals.p, goals.p, '#c8d8f0')}
+      ${renderBar('Glucides',  totals.g, goals.g, '#f0c040')}
+      ${renderBar('Lipides',   totals.l, goals.l, '#e87070')}
+      <div class="pills-row">
+        ${renderPill('P', totals.p, goals.p, '#c8d8f0')}
+        ${renderPill('G', totals.g, goals.g, '#f0c040')}
+        ${renderPill('L', totals.l, goals.l, '#e87070')}
       </div>
+    </div>
+  </div>`;
 
-      ${mealsHtml}
-
-      ${isToday ? `<div style="padding: 16px"><button class="btn" style="width:100%" onclick="app.renderDayView('${tomorrow}'); document.getElementById('app').innerHTML = app.renderDayView('${tomorrow}')">Planifier demain →</button></div>` : 
-                  `<div style="padding: 16px"><button class="btn" style="width:100%" onclick="app.render()">← Retour à Aujourd'hui</button></div>`}
-    `;
-  }
-
-  renderMacroBar(name, current, goal, color) {
-    const pct = Math.min((current / goal) * 100, 100);
-    return `
-      <div class="macro-col">
-        <span style="color:${color}">${name}</span>
-        <div class="progress-bg"><div class="progress-fill" style="width:${pct}%; background:${color}"></div></div>
-        <span>${Math.round(current)} / ${goal}</span>
-      </div>
-    `;
-  }
-
-  renderHistory() {
-    const dates = Object.keys(this.days).sort((a,b) => b.localeCompare(a));
-    return `<header><h1>Historique</h1></header> ` + dates.map(date => {
-      const d = this.days[date];
-      return `
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; margin-bottom: 10px;">
-            <h3>${date}</h3>
-            <span class="badge ${d.type}">${d.type}</span>
-          </div>
-          <button class="btn" style="width:100%" onclick="app.currentDate='${date}'; app.navigate('today'); document.getElementById('app').innerHTML = app.renderDayView('${date}')">✎ Modifier</button>
-        </div>
-      `;
+  let mealsHtml = '<div class="meals">';
+  for (let m = 1; m <= 6; m++) {
+    const entries  = day.meals[m] || [];
+    const mTotals  = calcMacros(entries);
+    const hasFood  = entries.length > 0;
+    const entriesHtml = entries.map((e, i) => {
+      const f = S.foods.find(x => x.id === e.foodId);
+      if (!f) return '';
+      const qty = f.unitWeight
+        ? `${+(e.grams / f.unitWeight).toFixed(1)} u.`
+        : `${e.grams}g`;
+      const mc = calcMacros([e]);
+      return `<div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
+        <span class="entry-name">${escHtml(f.name)}</span>
+        <span class="entry-qty">${qty}</span>
+        <span class="entry-kcal">${mc.kcal} kcal</span>
+      </div>`;
     }).join('');
+    mealsHtml += `
+    <div class="meal-section">
+      <div class="meal-header">
+        <span class="meal-title">Repas ${m}</span>
+        <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
+        <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}">+ Ajouter</button>
+      </div>
+      ${entriesHtml}
+    </div>`;
+  }
+  mealsHtml += '</div>';
+
+  const tomorrowBtn = isToday
+    ? `<button class="btn-tomorrow" data-action="viewTomorrow">Planifier demain →</button>`
+    : '';
+
+  return `
+  <div class="view-day">
+    ${header}
+    ${overAlert}
+    ${summary}
+    ${mealsHtml}
+    ${tomorrowBtn}
+  </div>`;
+}
+
+// ── Tab: History ──────────────────────────────────────────────
+
+function renderHistory() {
+  if (S.histSub === 'edit' && S.editDate) {
+    return renderDayView(S.editDate);
   }
 
-  renderFoods() {
-    let list = this.foods.map((f, i) => `
-      <div class="food-list-item">
-        <div><strong>${f.name}</strong><br><span style="color:#888; font-size:12px;">${f.kcal}kcal | ${f.p}P ${f.c}G ${f.f}L</span></div>
-      </div>
-    `).join('');
+  const tom    = tomorrowStr();
+  const tomDay = getDay(tom);
+  const tomT   = calcMacros(allEntries(tomDay));
+  const tomG   = S.goals[tomDay.type];
+  const tomBadge = tomDay.type === 'sport'
+    ? `<span class="badge-sport">Sport ⚡</span>`
+    : `<span class="badge-rest">Repos 🌙</span>`;
+
+  const tomorrowCard = `
+  <div class="hist-card hist-tomorrow">
+    <div class="hist-card-head">
+      <span class="hist-date">Demain — ${fmtDateShort(tom)}</span>
+      ${tomBadge}
+      <button class="btn-edit-sm" data-action="editHistDay" data-date="${tom}">✎ Modifier</button>
+    </div>
+    <div class="hist-macros">
+      <span class="hist-kcal">${tomT.kcal} kcal</span>
+      <span class="pill-sm" style="color:#c8d8f0">P ${tomT.p}g</span>
+      <span class="pill-sm" style="color:#f0c040">G ${tomT.g}g</span>
+      <span class="pill-sm" style="color:#e87070">L ${tomT.l}g</span>
+    </div>
+  </div>`;
+
+  const pastDates = Object.keys(S.days)
+    .filter(d => d < todayStr())
+    .sort((a, b) => b.localeCompare(a));
+
+  const pastHtml = pastDates.map(d => {
+    const day    = S.days[d];
+    const totals = calcMacros(allEntries(day));
+    const goals  = S.goals[day.type];
+    const pct    = goals.kcal > 0 ? clamp(totals.kcal / goals.kcal * 100, 0, 100) : 0;
+    const badge  = day.type === 'sport'
+      ? `<span class="badge-sport">Sport ⚡</span>`
+      : `<span class="badge-rest">Repos 🌙</span>`;
     return `
-      <header>
-        <h1>Ma Base</h1>
-        <button class="btn" onclick="app.openNewFood()">+ Nouveau</button>
-      </header>
-      <div style="padding: 16px;">${list}</div>
-    `;
-  }
-
-  renderSettings() {
-    return `
-      <header><h1>Réglages</h1></header>
-      <div class="card">
-        <h3>Exportation</h3>
-        <p style="color:#888; margin:10px 0;">Sauvegarde tes données localement.</p>
-        <button class="btn btn-primary" onclick="app.exportData()">Exporter JSON</button>
+    <div class="hist-card">
+      <div class="hist-card-head">
+        <span class="hist-date">${fmtDate(d)}</span>
+        ${badge}
+        <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
       </div>
-    `;
-  }
-
-  /* --- ACTIONS & MODALS --- */
-  toggleDayType(date) {
-    this.days[date].type = this.days[date].type === 'sport' ? 'rest' : 'sport';
-    this.save();
-    this.render();
-  }
-
-  openModal(html) {
-    document.getElementById('modal-body').innerHTML = html;
-    document.getElementById('modal').classList.add('show');
-  }
-  
-  closeModal() {
-    document.getElementById('modal').classList.remove('show');
-  }
-
-  openAddFood(date, mealIndex) {
-    let opts = this.foods.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-    this.openModal(`
-      <h3>Ajouter un aliment</h3>
-      <select id="food-select" style="width:100%; padding:14px; background:#222; color:white; border:none; border-radius:12px; margin: 15px 0;">
-        ${opts}
-      </select>
-      <input type="number" id="food-amount" placeholder="Quantité (grammes)" inputmode="numeric">
-      <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="app.saveEntry('${date}', ${mealIndex})">Ajouter</button>
-    `);
-  }
-
-  saveEntry(date, mealIndex) {
-    const foodId = document.getElementById('food-select').value;
-    const amount = parseFloat(document.getElementById('food-amount').value);
-    if(!amount || !foodId) return;
-    
-    const food = this.foods.find(f => f.id == foodId);
-    this.days[date].meals[mealIndex].push({ food, amount });
-    this.save();
-    this.closeModal();
-    this.render();
-  }
-
-  openEditEntry(date, mealIndex, entryIndex) {
-    const entry = this.days[date].meals[mealIndex][entryIndex];
-    this.openModal(`
-      <h3>Modifier ${entry.food.name}</h3>
-      <input type="number" id="edit-amount" value="${entry.amount}" inputmode="numeric">
-      <div style="display:flex; gap:10px; margin-top:10px">
-        <button class="btn btn-danger" style="flex:1" onclick="app.deleteEntry('${date}', ${mealIndex}, ${entryIndex})">Supprimer</button>
-        <button class="btn btn-primary" style="flex:1" onclick="app.updateEntry('${date}', ${mealIndex}, ${entryIndex})">Enregistrer</button>
+      <div class="hist-macros">
+        <span class="hist-kcal">${totals.kcal} kcal</span>
+        <span class="pill-sm" style="color:#c8d8f0">P ${totals.p}g</span>
+        <span class="pill-sm" style="color:#f0c040">G ${totals.g}g</span>
+        <span class="pill-sm" style="color:#e87070">L ${totals.l}g</span>
       </div>
-    `);
-  }
-
-  updateEntry(date, mealIndex, entryIndex) {
-    this.days[date].meals[mealIndex][entryIndex].amount = parseFloat(document.getElementById('edit-amount').value);
-    this.save();
-    this.closeModal();
-    this.render();
-  }
-
-  deleteEntry(date, mealIndex, entryIndex) {
-    this.days[date].meals[mealIndex].splice(entryIndex, 1);
-    this.save();
-    this.closeModal();
-    this.render();
-  }
-
-  openNewFood() {
-    this.openModal(`
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
-        <h3>Créer un aliment</h3>
-        <button class="btn" style="padding:8px" onclick="app.scanBarcode()">📷 Scan</button>
+      <div class="hist-bar-track">
+        <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
-      <input type="text" id="nf-name" placeholder="Nom">
-      <input type="number" id="nf-kcal" placeholder="Kcal pour 100g" inputmode="numeric">
-      <div style="display:flex; gap:10px">
-        <input type="number" id="nf-p" placeholder="Prot" inputmode="numeric">
-        <input type="number" id="nf-c" placeholder="Gluc" inputmode="numeric">
-        <input type="number" id="nf-f" placeholder="Lip" inputmode="numeric">
-      </div>
-      <button class="btn btn-primary" style="width:100%; margin-top:10px" onclick="app.saveNewFood()">Créer dans la base</button>
-    `);
-  }
+    </div>`;
+  }).join('');
 
-  saveNewFood() {
-    const f = {
-      id: Date.now(),
-      name: document.getElementById('nf-name').value,
-      kcal: parseFloat(document.getElementById('nf-kcal').value) || 0,
-      p: parseFloat(document.getElementById('nf-p').value) || 0,
-      c: parseFloat(document.getElementById('nf-c').value) || 0,
-      f: parseFloat(document.getElementById('nf-f').value) || 0
-    };
-    if(!f.name) return;
-    this.foods.push(f);
-    this.save();
-    this.closeModal();
-    this.render();
-  }
+  return `
+  <div class="view-history">
+    <h2>Historique</h2>
+    ${tomorrowCard}
+    ${pastHtml || '<p class="empty-state">Aucun historique pour l\'instant.<br>Commence à journaliser !</p>'}
+  </div>`;
+}
 
-  async scanBarcode() {
-    if (!('BarcodeDetector' in window)) {
-      alert("Le scanner natif iOS (BarcodeDetector) n'est pas actif sur ce navigateur.");
-      return;
+// ── Tab: Aliments ─────────────────────────────────────────────
+
+function renderFoods() {
+  const q        = S.foodsSearch || '';
+  const filtered = q.length > 0
+    ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+    : [...S.foods];
+  filtered.sort((a, b) => a.name.localeCompare(b, 'fr'));
+
+  const rows = filtered.map(f => `
+  <div class="food-card" data-action="editFoodDB" data-id="${f.id}">
+    <div class="food-name">${escHtml(f.name)}</div>
+    <div class="food-macros">
+      <span class="food-kcal">${f.kcal} kcal/100g</span>
+      <span style="color:#c8d8f0">P ${f.p}g</span>
+      <span style="color:#f0c040">G ${f.g}g</span>
+      <span style="color:#e87070">L ${f.l}g</span>
+      ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
+    </div>
+  </div>`).join('');
+
+  return `
+  <div class="view-foods">
+    <div class="foods-header">
+      <h2>Aliments</h2>
+      <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
+    </div>
+    <input class="search-input" type="search" placeholder="Rechercher dans ma base…"
+      value="${escHtml(q)}" data-action="searchFoods" autocomplete="off">
+    ${rows || '<p class="empty-state">Aucun aliment.<br>Appuie sur <strong>+ Nouveau</strong> pour commencer !</p>'}
+  </div>`;
+}
+
+// ── Tab: Réglages ─────────────────────────────────────────────
+
+function renderSettings() {
+  const blocks = ['sport', 'rest'].map(type => {
+    const g       = S.goals[type];
+    const editing = S.settingsEdit === type;
+    const t       = S.settingsTemp;
+    const label   = type === 'sport' ? 'Jour Sport ⚡' : 'Jour Repos 🌙';
+    const fields  = [
+      { key: 'kcal', label: 'Calories (kcal)' },
+      { key: 'p',    label: 'Protéines (g)' },
+      { key: 'g',    label: 'Glucides (g)' },
+      { key: 'l',    label: 'Lipides (g)' }
+    ];
+    if (editing) {
+      return `
+      <div class="settings-block">
+        <div class="settings-block-head">
+          <span class="settings-label">${label}</span>
+          <div class="settings-actions">
+            <button class="btn-save" data-action="saveGoals" data-type="${type}">Enregistrer</button>
+            <button class="btn-cancel" data-action="cancelGoals">Annuler</button>
+          </div>
+        </div>
+        ${fields.map(f => `
+        <div class="settings-field">
+          <label>${f.label}</label>
+          <input type="number" class="settings-input" data-key="${f.key}"
+            value="${t[f.key] !== undefined ? t[f.key] : g[f.key]}" inputmode="decimal">
+        </div>`).join('')}
+      </div>`;
     }
-    // Note: L'implémentation complète nécessite d'ouvrir la caméra avec getUserMedia et un canvas.
-    // Pour rester dans un fichier simple statique, voici la requête API OpenFoodFacts préparée :
-    alert("Simulation: Code scanné (nécessite l'accès caméra via getUserMedia dans un environnement HTTPS).");
-    /*
-    Exemple de l'appel que tu ferais une fois le code EAN détecté :
-    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-    const data = await res.json();
-    document.getElementById('nf-name').value = data.product.product_name;
-    document.getElementById('nf-kcal').value = data.product.nutriments['energy-kcal_100g'];
-    */
+    return `
+    <div class="settings-block">
+      <div class="settings-block-head">
+        <span class="settings-label">${label}</span>
+        <button class="btn-edit-sm" data-action="editGoals" data-type="${type}">✎ Modifier</button>
+      </div>
+      <div class="settings-values">
+        <span>${g.kcal} kcal</span>
+        <span style="color:#c8d8f0">P ${g.p}g</span>
+        <span style="color:#f0c040">G ${g.g}g</span>
+        <span style="color:#e87070">L ${g.l}g</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="view-settings">
+    <h2>Réglages</h2>
+    ${blocks}
+    <div class="settings-block">
+      <div class="settings-block-head">
+        <span class="settings-label">Export des données</span>
+      </div>
+      <div class="export-row">
+        <button class="btn-export" data-action="exportCSV">⬇ Exporter CSV</button>
+        <button class="btn-export" data-action="exportJSON">⬇ Exporter JSON</button>
+      </div>
+    </div>
+    <div class="settings-block" style="margin-top:4px">
+      <div class="settings-block-head">
+        <span class="settings-label" style="color:#555;font-size:12px">Version 1.0 — Mes Macros</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Modals ────────────────────────────────────────────────────
+
+function renderModal() {
+  let content = '';
+  switch (S.modal) {
+    case 'addFood':    content = renderAddFoodModal();    break;
+    case 'editEntry':  content = renderEditEntryModal();  break;
+    case 'addFoodDB':  content = renderAddFoodDBModal();  break;
+    case 'editFoodDB': content = renderEditFoodDBModal(); break;
+    default: return '';
+  }
+  return `
+  <div class="modal-overlay" data-action="closeModal">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      ${content}
+    </div>
+  </div>`;
+}
+
+function renderAddFoodModal() {
+  const q      = S.searchQ || '';
+  const { meal, date } = S.md;
+  const sel    = S.md.selectedFood;
+
+  if (!sel) {
+    // Search view
+    const list = q.length >= 1
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      : S.foods.slice().sort((a, b) => a.name.localeCompare(b, 'fr'));
+
+    const items = list.map(f => `
+    <div class="food-item" data-action="selectFood" data-id="${f.id}">
+      <span class="food-item-name">${escHtml(f.name)}</span>
+      <span class="food-item-kcal">${f.kcal} kcal/100g</span>
+    </div>`).join('');
+
+    const addNew = q
+      ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
+           data-name="${escHtml(q)}">➕ Ajouter "${escHtml(q)}" à ma base</button>`
+      : '';
+
+    return `
+    <h3 class="modal-title">Repas ${meal}</h3>
+    <div class="modal-search-wrap">
+      <input id="food-search" class="search-input" type="search"
+        placeholder="Rechercher un aliment…" value="${escHtml(q)}"
+        data-action="filterFoods" autocomplete="off" autocorrect="off">
+      <button class="btn-scan" data-action="scanBarcode" title="Scanner code-barres">📷</button>
+    </div>
+    <div class="food-list">
+      ${items || (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>')}
+      ${items && q ? addNew : ''}
+    </div>`;
   }
 
-  exportData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({days: this.days, foods: this.foods}));
-    const a = document.createElement('a');
-    a.setAttribute("href", dataStr);
-    a.setAttribute("download", "macros_export.json");
-    a.click();
+  // Selected food — qty input
+  const f        = sel;
+  const hasUnit  = !!f.unitWeight;
+  const useUnits = S.md.useUnits !== undefined ? S.md.useUnits : hasUnit;
+  const qty      = S.md.qty !== undefined ? S.md.qty : (hasUnit ? 1 : 100);
+  const grams    = useUnits ? qty * f.unitWeight : qty;
+  const mc       = calcMacros([{ foodId: f.id, grams }]);
+
+  let qtySection = '';
+  if (hasUnit) {
+    qtySection += `
+    <div class="unit-toggle-wrap">
+      <button class="unit-btn ${!useUnits ? 'active' : ''}" data-action="setUseUnits" data-val="0">Grammes</button>
+      <button class="unit-btn ${useUnits  ? 'active' : ''}" data-action="setUseUnits" data-val="1">Unités</button>
+    </div>`;
+  }
+  if (useUnits) {
+    qtySection += `
+    <div class="stepper">
+      <button class="stepper-btn" data-action="stepQty" data-d="-1">−</button>
+      <span class="stepper-val">${qty}</span>
+      <button class="stepper-btn" data-action="stepQty" data-d="1">+</button>
+    </div>
+    <p class="grams-note">${grams}g au total</p>`;
+  } else {
+    qtySection += `<input type="number" class="qty-input" id="qty-input"
+      value="${qty}" min="1" inputmode="decimal" placeholder="Grammes"
+      data-action="setQty">`;
+  }
+
+  return `
+  <h3 class="modal-title">Repas ${meal}</h3>
+  <div class="modal-food-selected">
+    <button class="btn-back-sm" data-action="unselectFood">← Retour</button>
+    <h3 class="modal-food-name">${escHtml(f.name)}</h3>
+    <div class="modal-macros-preview" id="macros-preview">
+      <span>${mc.kcal} kcal</span>
+      <span style="color:#c8d8f0">P ${mc.p}g</span>
+      <span style="color:#f0c040">G ${mc.g}g</span>
+      <span style="color:#e87070">L ${mc.l}g</span>
+    </div>
+    ${qtySection}
+    <button class="btn-confirm" data-action="confirmAddFood">Ajouter au Repas ${meal}</button>
+  </div>`;
+}
+
+function renderEditEntryModal() {
+  const { meal, idx, date } = S.md;
+  const day   = S.days[date];
+  const entry = day?.meals[meal]?.[idx];
+  if (!entry) return '<p style="padding:20px;color:#888">Entrée introuvable.</p>';
+  const f = S.foods.find(x => x.id === entry.foodId);
+  if (!f) return '<p style="padding:20px;color:#888">Aliment supprimé de la base.</p>';
+
+  const hasUnit  = !!f.unitWeight;
+  const useUnits = S.md.useUnits !== undefined ? S.md.useUnits : hasUnit;
+  const grams    = S.md.grams !== undefined ? S.md.grams : entry.grams;
+  const qtyUnits = useUnits ? +(grams / f.unitWeight).toFixed(1) : grams;
+  const mc       = calcMacros([{ foodId: f.id, grams }]);
+
+  let qtySection = '';
+  if (hasUnit) {
+    qtySection += `
+    <div class="unit-toggle-wrap">
+      <button class="unit-btn ${!useUnits ? 'active' : ''}" data-action="editSetUseUnits" data-val="0">Grammes</button>
+      <button class="unit-btn ${useUnits  ? 'active' : ''}" data-action="editSetUseUnits" data-val="1">Unités</button>
+    </div>`;
+  }
+  if (useUnits) {
+    qtySection += `
+    <div class="stepper">
+      <button class="stepper-btn" data-action="editStepQty" data-d="-1">−</button>
+      <span class="stepper-val">${qtyUnits}</span>
+      <button class="stepper-btn" data-action="editStepQty" data-d="1">+</button>
+    </div>
+    <p class="grams-note">${grams}g au total</p>`;
+  } else {
+    qtySection += `<input type="number" class="qty-input" id="edit-qty-input"
+      value="${grams}" min="1" inputmode="decimal" data-action="editSetQty">`;
+  }
+
+  return `
+  <h3 class="modal-title">${escHtml(f.name)}</h3>
+  <div class="modal-macros-preview" id="macros-preview">
+    <span>${mc.kcal} kcal</span>
+    <span style="color:#c8d8f0">P ${mc.p}g</span>
+    <span style="color:#f0c040">G ${mc.g}g</span>
+    <span style="color:#e87070">L ${mc.l}g</span>
+  </div>
+  ${qtySection}
+  <div class="modal-edit-actions">
+    <button class="btn-delete" data-action="deleteEntry">Supprimer</button>
+    <button class="btn-confirm" data-action="saveEntry">Enregistrer</button>
+  </div>`;
+}
+
+function renderAddFoodDBModal() {
+  const d = S.md;
+  return `
+  <h3 class="modal-title">Nouvel aliment</h3>
+  <div class="form-group">
+    <label>Nom de l'aliment</label>
+    <input type="text" class="form-input" id="db-name"
+      value="${escHtml(d.name || '')}" placeholder="ex : Poulet grillé" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label>Calories (kcal pour 100g)</label>
+    <input type="number" class="form-input" id="db-kcal"
+      value="${d.kcal || ''}" placeholder="165" inputmode="decimal">
+  </div>
+  <div class="form-row-3">
+    <div class="form-group">
+      <label>Protéines (g)</label>
+      <input type="number" class="form-input" id="db-p"
+        value="${d.p || ''}" placeholder="31" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Glucides (g)</label>
+      <input type="number" class="form-input" id="db-g"
+        value="${d.g || ''}" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Lipides (g)</label>
+      <input type="number" class="form-input" id="db-l"
+        value="${d.l || ''}" placeholder="3.6" inputmode="decimal">
+    </div>
+  </div>
+  <div class="form-group" style="margin-top:4px">
+    <label>Poids unitaire (g/unité) — optionnel</label>
+    <input type="number" class="form-input" id="db-unit"
+      value="${d.unitWeight || ''}" placeholder="ex : 120 pour un œuf entier" inputmode="decimal">
+  </div>
+  <button class="btn-confirm" data-action="saveFoodDB">Enregistrer dans ma base</button>`;
+}
+
+function renderEditFoodDBModal() {
+  const f = S.foods.find(x => x.id === S.md.foodId);
+  if (!f) return '<p style="padding:20px;color:#888">Introuvable.</p>';
+  return `
+  <h3 class="modal-title">Modifier — ${escHtml(f.name)}</h3>
+  <div class="form-group">
+    <label>Nom</label>
+    <input type="text" class="form-input" id="db-name" value="${escHtml(f.name)}" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label>Calories (kcal/100g)</label>
+    <input type="number" class="form-input" id="db-kcal" value="${f.kcal}" inputmode="decimal">
+  </div>
+  <div class="form-row-3">
+    <div class="form-group">
+      <label>Protéines</label>
+      <input type="number" class="form-input" id="db-p" value="${f.p}" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Glucides</label>
+      <input type="number" class="form-input" id="db-g" value="${f.g}" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Lipides</label>
+      <input type="number" class="form-input" id="db-l" value="${f.l}" inputmode="decimal">
+    </div>
+  </div>
+  <div class="form-group" style="margin-top:4px">
+    <label>Poids unitaire (g/unité)</label>
+    <input type="number" class="form-input" id="db-unit" value="${f.unitWeight || ''}" inputmode="decimal">
+  </div>
+  <div class="modal-edit-actions">
+    <button class="btn-delete" data-action="deleteFoodDB" data-id="${f.id}">Supprimer</button>
+    <button class="btn-confirm" data-action="updateFoodDB" data-id="${f.id}">Enregistrer</button>
+  </div>`;
+}
+
+// ── Navigation Bar ────────────────────────────────────────────
+
+function renderNav() {
+  const tabs = [
+    { id: 'today',    icon: '⬤',  label: "Aujourd'hui" },
+    { id: 'history',  icon: '◷',  label: 'Historique'  },
+    { id: 'foods',    icon: '◈',  label: 'Aliments'    },
+    { id: 'settings', icon: '◎', label: 'Réglages'    }
+  ];
+  const nav = document.getElementById('nav');
+  nav.innerHTML = tabs.map(t => `
+  <button class="nav-btn ${S.tab === t.id ? 'active' : ''}" data-tab="${t.id}">
+    <span class="nav-icon">${t.icon}</span>
+    <span class="nav-label">${t.label}</span>
+  </button>`).join('');
+  nav.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.tab     = btn.dataset.tab;
+      S.modal   = null;
+      S.md      = {};
+      S.searchQ = '';
+      if (S.tab === 'today') {
+        S.viewDate = todayStr();
+      }
+      if (S.tab !== 'history') {
+        S.histSub  = 'list';
+        S.editDate = null;
+      }
+      render();
+      renderNav();
+    });
+  });
+}
+
+// ── Main Render ───────────────────────────────────────────────
+
+function render() {
+  let view = '';
+  switch (S.tab) {
+    case 'today':    view = renderDayView(S.viewDate); break;
+    case 'history':  view = renderHistory();            break;
+    case 'foods':    view = renderFoods();              break;
+    case 'settings': view = renderSettings();           break;
+  }
+  const modal  = S.modal ? renderModal() : '';
+  const app    = document.getElementById('app');
+  app.innerHTML = view + modal;
+  bindEvents();
+}
+
+// ── Event Handling ────────────────────────────────────────────
+
+function bindEvents() {
+  const app = document.getElementById('app');
+  app.addEventListener('click', handleClick, { passive: false });
+  app.addEventListener('input', handleInput, { passive: true });
+}
+
+function handleClick(e) {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+
+  switch (a) {
+
+    // ── Navigation within views
+    case 'back':
+      if (S.tab === 'today') {
+        S.viewDate = todayStr();
+      } else if (S.tab === 'history') {
+        S.histSub  = 'list';
+        S.editDate = null;
+      }
+      render();
+      break;
+
+    case 'viewTomorrow':
+      S.viewDate = tomorrowStr();
+      render();
+      renderNav();
+      break;
+
+    case 'editHistDay':
+      S.histSub  = 'edit';
+      S.editDate = el.dataset.date;
+      render();
+      break;
+
+    // ── Day type toggle
+    case 'toggleType': {
+      const date = el.dataset.date;
+      const day  = getDay(date);
+      day.type   = day.type === 'sport' ? 'rest' : 'sport';
+      save();
+      render();
+      break;
+    }
+
+    // ── Modal: Add food to meal
+    case 'openAddFood':
+      S.modal   = 'addFood';
+      S.searchQ = '';
+      S.md      = { meal: +el.dataset.meal, date: el.dataset.date };
+      render();
+      setTimeout(() => document.getElementById('food-search')?.focus(), 80);
+      break;
+
+    case 'closeModal':
+      S.modal = null;
+      S.md    = {};
+      S.searchQ = '';
+      render();
+      break;
+
+    case 'selectFood': {
+      const f      = S.foods.find(x => x.id === el.dataset.id);
+      if (!f) break;
+      S.md.selectedFood = f;
+      S.md.useUnits     = !!f.unitWeight;
+      S.md.qty          = f.unitWeight ? 1 : 100;
+      render();
+      setTimeout(() => document.getElementById('qty-input')?.focus(), 80);
+      break;
+    }
+
+    case 'unselectFood':
+      S.md.selectedFood = null;
+      render();
+      setTimeout(() => document.getElementById('food-search')?.focus(), 80);
+      break;
+
+    case 'setUseUnits': {
+      const wasUnit     = S.md.useUnits;
+      S.md.useUnits     = el.dataset.val === '1';
+      const f           = S.md.selectedFood;
+      // Convert quantity
+      if (wasUnit && !S.md.useUnits && f?.unitWeight) {
+        S.md.qty = (S.md.qty || 1) * f.unitWeight;
+      } else if (!wasUnit && S.md.useUnits && f?.unitWeight) {
+        S.md.qty = Math.max(1, Math.round((S.md.qty || 100) / f.unitWeight));
+      } else {
+        S.md.qty = S.md.useUnits ? 1 : 100;
+      }
+      render();
+      break;
+    }
+
+    case 'stepQty': {
+      const step = +el.dataset.d;
+      S.md.qty   = Math.max(0.5, (S.md.qty || 1) + step);
+      // Update preview without full re-render to avoid keyboard dismiss
+      updateMacrosPreview();
+      const val = document.querySelector('.stepper-val');
+      if (val) val.textContent = S.md.qty;
+      const note = document.querySelector('.grams-note');
+      if (note && S.md.selectedFood?.unitWeight) {
+        note.textContent = `${S.md.qty * S.md.selectedFood.unitWeight}g au total`;
+      }
+      break;
+    }
+
+    case 'confirmAddFood': {
+      const { meal, date, selectedFood, useUnits } = S.md;
+      let grams;
+      if (useUnits) {
+        grams = S.md.qty * selectedFood.unitWeight;
+      } else {
+        const inp = document.getElementById('qty-input');
+        grams = inp ? +inp.value : S.md.qty;
+      }
+      if (!grams || grams <= 0) { showToast('Saisis une quantité valide.'); break; }
+      const day = getDay(date);
+      day.meals[meal].push({ foodId: selectedFood.id, grams });
+      save();
+      S.modal = null;
+      S.md    = {};
+      render();
+      break;
+    }
+
+    // ── Modal: Edit existing entry
+    case 'editEntry': {
+      const { meal, idx, date } = el.dataset;
+      const entry = S.days[date]?.meals[meal]?.[+idx];
+      if (!entry) break;
+      const f = S.foods.find(x => x.id === entry.foodId);
+      S.modal = 'editEntry';
+      S.md    = {
+        meal:     +meal,
+        idx:      +idx,
+        date,
+        grams:    entry.grams,
+        useUnits: !!(f?.unitWeight)
+      };
+      render();
+      break;
+    }
+
+    case 'editSetUseUnits': {
+      const wasUnit = S.md.useUnits;
+      S.md.useUnits = el.dataset.val === '1';
+      const entry   = S.days[S.md.date]?.meals[S.md.meal]?.[S.md.idx];
+      const f       = entry ? S.foods.find(x => x.id === entry.foodId) : null;
+      if (f?.unitWeight) {
+        if (wasUnit && !S.md.useUnits) {
+          // grams already stored as grams, no conversion needed
+        } else if (!wasUnit && S.md.useUnits) {
+          S.md.grams = Math.round(S.md.grams / f.unitWeight) * f.unitWeight || f.unitWeight;
+        }
+      }
+      render();
+      break;
+    }
+
+    case 'editStepQty': {
+      const step  = +el.dataset.d;
+      const entry = S.days[S.md.date]?.meals[S.md.meal]?.[S.md.idx];
+      const f     = entry ? S.foods.find(x => x.id === entry.foodId) : null;
+      const unit  = f?.unitWeight || 1;
+      S.md.grams  = Math.max(unit, S.md.grams + step * unit);
+      updateMacrosPreview();
+      const val = document.querySelector('.stepper-val');
+      if (val && f?.unitWeight) val.textContent = +(S.md.grams / f.unitWeight).toFixed(1);
+      const note = document.querySelector('.grams-note');
+      if (note) note.textContent = `${S.md.grams}g au total`;
+      break;
+    }
+
+    case 'saveEntry': {
+      const { meal, idx, date, useUnits } = S.md;
+      let grams;
+      if (useUnits) {
+        grams = S.md.grams;
+      } else {
+        const inp = document.getElementById('edit-qty-input');
+        grams     = inp ? +inp.value : S.md.grams;
+      }
+      if (!grams || grams <= 0) { showToast('Quantité invalide.'); break; }
+      const day = S.days[date];
+      if (day?.meals[meal]?.[idx] !== undefined) {
+        day.meals[meal][idx].grams = grams;
+        save();
+      }
+      S.modal = null;
+      S.md    = {};
+      render();
+      break;
+    }
+
+    case 'deleteEntry': {
+      const { meal, idx, date } = S.md;
+      const day = S.days[date];
+      if (day?.meals[meal]) {
+        day.meals[meal].splice(idx, 1);
+        save();
+      }
+      S.modal = null;
+      S.md    = {};
+      render();
+      break;
+    }
+
+    // ── Modal: Add food to database
+    case 'openAddFoodDB':
+      S.modal = 'addFoodDB';
+      S.md    = {};
+      render();
+      setTimeout(() => document.getElementById('db-name')?.focus(), 80);
+      break;
+
+    case 'addFoodToDBFromSearch': {
+      const { meal, date } = S.md;
+      S.modal = 'addFoodDB';
+      S.md    = { name: el.dataset.name, pendingMeal: meal, pendingDate: date };
+      render();
+      setTimeout(() => document.getElementById('db-kcal')?.focus(), 80);
+      break;
+    }
+
+    case 'saveFoodDB': {
+      const name = document.getElementById('db-name')?.value.trim();
+      const kcal = +document.getElementById('db-kcal')?.value;
+      const p    = +document.getElementById('db-p')?.value    || 0;
+      const g    = +document.getElementById('db-g')?.value    || 0;
+      const l    = +document.getElementById('db-l')?.value    || 0;
+      const uw   = +document.getElementById('db-unit')?.value || null;
+      if (!name)  { showToast('Donne un nom à l\'aliment.'); break; }
+      if (!kcal)  { showToast('Les calories sont requises.'); break; }
+      const food = { id: uid(), name, kcal, p, g, l, unitWeight: uw || null };
+      S.foods.push(food);
+      save();
+      if (S.md.pendingMeal) {
+        // Return to add food modal with new food pre-selected
+        S.modal = 'addFood';
+        S.md    = {
+          meal:         S.md.pendingMeal,
+          date:         S.md.pendingDate,
+          selectedFood: food,
+          useUnits:     !!food.unitWeight,
+          qty:          food.unitWeight ? 1 : 100
+        };
+      } else {
+        S.modal = null;
+        S.md    = {};
+      }
+      showToast(`"${name}" ajouté à ta base !`);
+      render();
+      break;
+    }
+
+    // ── Modal: Edit food in database
+    case 'editFoodDB':
+      S.modal = 'editFoodDB';
+      S.md    = { foodId: el.dataset.id };
+      render();
+      break;
+
+    case 'updateFoodDB': {
+      const id = el.dataset.id;
+      const f  = S.foods.find(x => x.id === id);
+      if (!f) break;
+      f.name       = document.getElementById('db-name')?.value.trim() || f.name;
+      f.kcal       = +document.getElementById('db-kcal')?.value       || f.kcal;
+      f.p          = +document.getElementById('db-p')?.value          || 0;
+      f.g          = +document.getElementById('db-g')?.value          || 0;
+      f.l          = +document.getElementById('db-l')?.value          || 0;
+      f.unitWeight = +document.getElementById('db-unit')?.value       || null;
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast('Aliment mis à jour.');
+      render();
+      break;
+    }
+
+    case 'deleteFoodDB': {
+      const id = el.dataset.id;
+      S.foods  = S.foods.filter(x => x.id !== id);
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast('Aliment supprimé.');
+      render();
+      break;
+    }
+
+    // ── Settings
+    case 'editGoals':
+      S.settingsEdit = el.dataset.type;
+      S.settingsTemp = { ...S.goals[el.dataset.type] };
+      render();
+      break;
+
+    case 'saveGoals': {
+      const type = el.dataset.type;
+      document.querySelectorAll('.settings-input').forEach(inp => {
+        S.goals[type][inp.dataset.key] = +inp.value || 0;
+      });
+      save();
+      S.settingsEdit = null;
+      showToast('Objectifs enregistrés.');
+      render();
+      break;
+    }
+
+    case 'cancelGoals':
+      S.settingsEdit = null;
+      render();
+      break;
+
+    // ── Export
+    case 'exportCSV':  exportCSV();  break;
+    case 'exportJSON': exportJSON(); break;
+
+    // ── Barcode
+    case 'scanBarcode': scanBarcode(); break;
+
+    // ── Foods tab search
+    case 'searchFoods': break; // handled in handleInput
   }
 }
 
-const app = new MacrosApp();
+function handleInput(e) {
+  const el = e.target;
+  const a  = el.dataset.action;
+
+  if (a === 'filterFoods') {
+    S.searchQ = el.value;
+    const q   = S.searchQ;
+    // Re-render food list without full render to keep keyboard open
+    const list = q.length >= 1
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      : S.foods.slice().sort((a, b) => a.name.localeCompare(b, 'fr'));
+    const items = list.map(f => `
+    <div class="food-item" data-action="selectFood" data-id="${f.id}">
+      <span class="food-item-name">${escHtml(f.name)}</span>
+      <span class="food-item-kcal">${f.kcal} kcal/100g</span>
+    </div>`).join('');
+    const addNew = q
+      ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
+           data-name="${escHtml(q)}">➕ Ajouter "${escHtml(q)}" à ma base</button>`
+      : '';
+    const fl = document.querySelector('.food-list');
+    if (fl) {
+      fl.innerHTML = items
+        ? items + (q ? addNew : '')
+        : (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>');
+      fl.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', handleClick));
+    }
+    return;
+  }
+
+  if (a === 'searchFoods') {
+    S.foodsSearch = el.value;
+    // Re-render only the food list section
+    const q = S.foodsSearch;
+    const filtered = q.length > 0
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      : [...S.foods];
+    filtered.sort((a, b) => a.name.localeCompare(b, 'fr'));
+    const rows = filtered.map(f => `
+    <div class="food-card" data-action="editFoodDB" data-id="${f.id}">
+      <div class="food-name">${escHtml(f.name)}</div>
+      <div class="food-macros">
+        <span class="food-kcal">${f.kcal} kcal/100g</span>
+        <span style="color:#c8d8f0">P ${f.p}g</span>
+        <span style="color:#f0c040">G ${f.g}g</span>
+        <span style="color:#e87070">L ${f.l}g</span>
+        ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
+      </div>
+    </div>`).join('');
+    // Replace all food-card elements
+    const existing = document.querySelectorAll('.food-card, .view-foods .empty-state');
+    existing.forEach(el => el.remove());
+    const container = document.querySelector('.view-foods');
+    if (container) {
+      const div = document.createElement('div');
+      div.innerHTML = rows || '<p class="empty-state">Aucun résultat.</p>';
+      Array.from(div.children).forEach(child => {
+        container.appendChild(child);
+        child.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', handleClick));
+        if (child.dataset.action) child.addEventListener('click', handleClick);
+      });
+    }
+    return;
+  }
+
+  if (a === 'setQty') {
+    S.md.qty = +el.value;
+    updateMacrosPreview();
+  }
+
+  if (a === 'editSetQty') {
+    S.md.grams = +el.value;
+    updateMacrosPreview();
+  }
+}
+
+function updateMacrosPreview() {
+  const preview = document.getElementById('macros-preview');
+  if (!preview) return;
+  // Determine which food and grams
+  let foodId, grams;
+  if (S.modal === 'addFood' && S.md.selectedFood) {
+    foodId = S.md.selectedFood.id;
+    grams  = S.md.useUnits ? S.md.qty * S.md.selectedFood.unitWeight : S.md.qty;
+  } else if (S.modal === 'editEntry') {
+    const entry = S.days[S.md.date]?.meals[S.md.meal]?.[S.md.idx];
+    if (!entry) return;
+    foodId = entry.foodId;
+    grams  = S.md.grams;
+  }
+  if (!foodId || !grams) return;
+  const mc = calcMacros([{ foodId, grams }]);
+  preview.innerHTML = `
+    <span>${mc.kcal} kcal</span>
+    <span style="color:#c8d8f0">P ${mc.p}g</span>
+    <span style="color:#f0c040">G ${mc.g}g</span>
+    <span style="color:#e87070">L ${mc.l}g</span>`;
+}
+
+// ── Export ────────────────────────────────────────────────────
+
+function exportCSV() {
+  const header = ['Date', 'Type', 'Calories', 'Protéines (g)', 'Glucides (g)', 'Lipides (g)'];
+  const rows   = Object.entries(S.days)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, day]) => {
+      const t = calcMacros(allEntries(day));
+      return [date, day.type, t.kcal, t.p, t.g, t.l].join(',');
+    });
+  const csv = [header.join(','), ...rows].join('\n');
+  download('macros-export.csv', csv, 'text/csv;charset=utf-8;');
+  showToast('Export CSV téléchargé !');
+}
+
+function exportJSON() {
+  const data = {
+    exportDate: new Date().toISOString(),
+    days:  S.days,
+    foods: S.foods,
+    goals: S.goals
+  };
+  download('macros-export.json', JSON.stringify(data, null, 2), 'application/json');
+  showToast('Export JSON téléchargé !');
+}
+
+function download(filename, content, mime) {
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── Barcode Scanner ───────────────────────────────────────────
+
+async function scanBarcode() {
+  if (!('BarcodeDetector' in window)) {
+    showToast('Scanner non disponible — entre le code manuellement.');
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const overlay = document.createElement('div');
+    overlay.className = 'scanner-overlay';
+    overlay.innerHTML = `
+      <video id="scan-video" autoplay playsinline muted></video>
+      <p>Pointe vers le code-barres…</p>
+      <button id="scan-cancel">Annuler</button>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#scan-video').srcObject = stream;
+
+    const stopScan = () => {
+      clearInterval(timer);
+      stream.getTracks().forEach(t => t.stop());
+      overlay.remove();
+    };
+    overlay.querySelector('#scan-cancel').onclick = stopScan;
+
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+    const timer    = setInterval(async () => {
+      const vid = overlay.querySelector('#scan-video');
+      if (!vid || !vid.readyState >= 2) return;
+      try {
+        const barcodes = await detector.detect(vid);
+        if (barcodes.length > 0) {
+          stopScan();
+          await fetchOpenFoodFacts(barcodes[0].rawValue);
+        }
+      } catch (_) { /* continue scanning */ }
+    }, 500);
+
+  } catch (err) {
+    showToast('Caméra non accessible : ' + err.message);
+  }
+}
+
+async function fetchOpenFoodFacts(barcode) {
+  showToast('Recherche du produit…');
+  try {
+    const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await res.json();
+    if (data.status !== 1) {
+      showToast('Produit non trouvé. Saisis les infos manuellement.');
+      return;
+    }
+    const prod = data.product;
+    const n    = prod.nutriments;
+    const kcal = Math.round(
+      n['energy-kcal_100g'] ||
+      (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0)
+    );
+    const { meal, date } = S.md;
+    S.modal = 'addFoodDB';
+    S.md    = {
+      name:        prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
+      kcal,
+      p:           +(n['proteins_100g']       || 0).toFixed(1),
+      g:           +(n['carbohydrates_100g']  || 0).toFixed(1),
+      l:           +(n['fat_100g']            || 0).toFixed(1),
+      pendingMeal: meal,
+      pendingDate: date
+    };
+    render();
+    showToast('Produit trouvé ! Vérifie les infos.');
+  } catch (err) {
+    showToast('Erreur réseau : ' + err.message);
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+
+function showToast(msg) {
+  // Remove existing toast
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className   = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => t.classList.add('toast-show'));
+  });
+  setTimeout(() => {
+    t.classList.remove('toast-show');
+    setTimeout(() => t.remove(), 300);
+  }, 2800);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+
+function init() {
+  load();
+  S.viewDate = todayStr();
+  // Create today if it doesn't exist yet
+  getDay(S.viewDate);
+  render();
+  renderNav();
+}
+
+document.addEventListener('DOMContentLoaded', init);

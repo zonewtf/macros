@@ -1,34 +1,49 @@
-const CACHE_NAME = 'macros-v1';
+const CACHE = 'macros-v1';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
   './app.js',
-  './manifest.json'
+  './style.css',
+  './manifest.json',
+  './icons/icon.svg'
 ];
 
-self.addEventListener('install', (e) => {
+self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(keyList.map((key) => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      }));
-    })
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
+self.addEventListener('fetch', e => {
+  // Only cache same-origin or app assets
+  if (!e.request.url.startsWith(self.location.origin) &&
+      !e.request.url.includes('openfoodfacts.org')) {
+    return;
+  }
+  if (e.request.url.includes('openfoodfacts.org')) {
+    // Network first for API calls
+    e.respondWith(fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
+  // Cache first for app assets
   e.respondWith(
-    caches.match(e.request).then((res) => {
-      return res || fetch(e.request).catch(() => caches.match('./index.html'));
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy));
+        }
+        return res;
+      });
     })
   );
 });
