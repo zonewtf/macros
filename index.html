@@ -21,12 +21,25 @@
   <div id="app"></div>
   <nav id="nav"></nav>
 
-  <script src="app.js"></script>
+<script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .catch(err => console.warn('SW registration failed:', err));
+        // Le Date.now() force le navigateur à vérifier la présence d'un nouveau sw.js sur GitHub
+        navigator.serviceWorker.register('./sw.js?v=' + Date.now())
+          .then(reg => {
+            // Détection de mise à jour
+            reg.onupdatefound = () => {
+              const installingWorker = reg.installing;
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // On affiche une alerte pour savoir que c'est bon
+                  alert("Mise à jour téléchargée ! Fermez l'app (kill) et rouvrez-la pour voir les changements.");
+                }
+              };
+            };
+          })
+          .catch(err => console.warn('Erreur SW:', err));
       });
     }
   </script>
