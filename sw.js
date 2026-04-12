@@ -1,10 +1,12 @@
-const CACHE = 'macros-v1';
+const CACHE = 'macros-v2';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './style.css',
   './manifest.json',
+  './sw.js',
+  './foods.csv',
   './icons/icon.svg'
 ];
 

@@ -1256,15 +1256,53 @@ function showToast(msg) {
   }, 2800);
 }
 
+// ── CSV Loader ────────────────────────────────────────────────
+
+async function loadCSVFoods() {
+  try {
+    const res = await fetch('./foods.csv');
+    if (!res.ok) return;
+    const text = await res.text();
+    const lines = text.trim().split('\n').slice(1); // skip header
+    let added = 0;
+    for (const line of lines) {
+      // Handle commas inside quoted fields (basic)
+      const cols = line.split(',');
+      if (cols.length < 6) continue;
+      const [marque, nom, kcal, p, g, l, uw] = cols.map(c => c.trim());
+      if (!nom || !kcal) continue;
+      const fullName = marque ? `${marque} — ${nom}` : nom;
+      if (S.foods.some(f => f.name === fullName)) continue;
+      S.foods.push({
+        id:         uid(),
+        name:       fullName,
+        kcal:       +kcal  || 0,
+        p:          +p     || 0,
+        g:          +g     || 0,
+        l:          +l     || 0,
+        unitWeight: uw ? +uw : null
+      });
+      added++;
+    }
+    if (added > 0) {
+      save();
+    }
+  } catch (err) {
+    console.warn('[Macros] Impossible de charger foods.csv :', err);
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 
-function init() {
+async function init() {
   load();
   S.viewDate = todayStr();
-  // Create today if it doesn't exist yet
   getDay(S.viewDate);
   render();
   renderNav();
+  // Load CSV in background — re-render foods tab if needed
+  await loadCSVFoods();
+  if (S.tab === 'foods') render();
 }
 
 document.addEventListener('DOMContentLoaded', init);

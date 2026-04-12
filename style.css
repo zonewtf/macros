@@ -40,11 +40,11 @@ input { font: inherit; color: inherit; }
 #app {
   position: fixed;
   top: 0; left: 0; right: 0;
-  bottom: calc(var(--nav-h) + var(--safe-b));
+  bottom: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: calc(var(--safe-t) + 16px) calc(16px + var(--safe-l)) 24px calc(16px + var(--safe-r));
+  padding: calc(var(--safe-t) + 16px) calc(16px + var(--safe-l)) calc(var(--nav-h) + var(--safe-b) + 32px) calc(16px + var(--safe-r));
 }
 #nav {
   position: fixed;
