@@ -214,9 +214,18 @@ function renderDayView(date) {
         : `${e.grams}g`;
       const mc = calcMacros([e]);
       return `<div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
-        <span class="entry-name">${escHtml(f.name)}</span>
-        <span class="entry-qty">${qty}</span>
-        <span class="entry-kcal">${mc.kcal} kcal</span>
+        <div class="entry-left">
+          <span class="entry-name">${escHtml(f.name)}</span>
+          <div class="entry-macros-row">
+            <span class="entry-macro-p">P ${mc.p}g</span>
+            <span class="entry-macro-g">G ${mc.g}g</span>
+            <span class="entry-macro-l">L ${mc.l}g</span>
+          </div>
+        </div>
+        <div class="entry-right">
+          <span class="entry-qty">${qty}</span>
+          <span class="entry-kcal">${mc.kcal} kcal</span>
+        </div>
       </div>`;
     }).join('');
     mealsHtml += `

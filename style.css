@@ -44,8 +44,8 @@ input { font: inherit; color: inherit; }
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  /* padding-bottom: 160px couvre nav (60px) + home indicator (34px) + Safari toolbar (50px) + marge */
-  padding: calc(var(--safe-t) + 16px) 16px 160px 16px;
+  /* padding-bottom: 220px couvre nav + home indicator + barre Safari + marge large */
+  padding: calc(var(--safe-t) + 16px) 16px 220px 16px;
 }
 #nav {
   position: fixed;
@@ -241,14 +241,19 @@ h2 {
   align-items: center;
   padding: 10px 14px;
   border-top: 1px solid var(--border);
-  gap: 8px;
-  active-scale: 0.98;
+  gap: 10px;
   transition: background 0.1s;
 }
 .meal-entry:active { background: rgba(255,255,255,0.04); }
-.entry-name { flex: 1; font-size: 14px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.entry-qty { font-size: 12px; color: var(--text3); flex-shrink: 0; }
-.entry-kcal { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.entry-left { flex: 1; min-width: 0; }
+.entry-name { display: block; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+.entry-macros-row { display: flex; gap: 8px; }
+.entry-macro-p { font-size: 11px; color: var(--macro-p); font-weight: 500; }
+.entry-macro-g { font-size: 11px; color: var(--macro-g); font-weight: 500; }
+.entry-macro-l { font-size: 11px; color: var(--macro-l); font-weight: 500; }
+.entry-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.entry-qty { font-size: 12px; color: var(--text3); }
+.entry-kcal { font-size: 12px; color: var(--text2); font-weight: 500; }
 
 /* ─── Tomorrow Button ────────────────────────────────────────── */
 .btn-tomorrow {
