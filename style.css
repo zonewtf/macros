@@ -624,11 +624,12 @@ h2 {
   font-weight: 700;
   text-align: center;
   margin-top: 8px;
-  margin-bottom: 69px;
   transition: opacity 0.15s;
 }
 .btn-confirm:active { opacity: 0.85; }
 .btn-confirm:disabled { opacity: 0.3; pointer-events: none; }
+/* Magouille nav — ajouter .nav-spacer sur les boutons en bas de modale */
+.nav-spacer { margin-bottom: 69px; }
 
 /* Edit entry */
 .modal-edit-actions {

@@ -519,7 +519,7 @@ function renderAddFoodModal() {
       <span style="color:#e87070">L ${mc.l}g</span>
     </div>
     ${qtySection}
-    <button class="btn-confirm" data-action="confirmAddFood">Ajouter au Repas ${meal}</button>
+    <button class="btn-confirm nav-spacer" data-action="confirmAddFood">Ajouter au Repas ${meal}</button>
   </div>`;
 }
 
@@ -609,7 +609,7 @@ function renderAddFoodDBModal() {
     <input type="number" class="form-input" id="db-unit"
       value="${d.unitWeight || ''}" placeholder="ex : 120 pour un œuf entier" inputmode="decimal">
   </div>
-  <button class="btn-confirm" data-action="saveFoodDB">Enregistrer dans ma base</button>`;
+  <button class="btn-confirm nav-spacer" data-action="saveFoodDB">Enregistrer dans ma base</button>`;
 }
 
 function renderEditFoodDBModal() {
