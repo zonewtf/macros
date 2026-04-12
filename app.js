@@ -567,7 +567,7 @@ function renderEditEntryModal() {
     <span style="color:#e87070">L ${mc.l}g</span>
   </div>
   ${qtySection}
-  <div class="modal-edit-actions">
+  <div class="modal-edit-actions nav-spacer">
     <button class="btn-delete" data-action="deleteEntry">Supprimer</button>
     <button class="btn-confirm" data-action="saveEntry">Enregistrer</button>
   </div>`;
