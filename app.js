@@ -14,17 +14,19 @@ const DEFAULT_GOALS = {
 
 let S = {
   tab:         'today',
-  viewDate:    '',           // date shown in today tab
-  histSub:     'list',       // 'list' | 'edit'
-  editDate:    null,         // date being edited in history
-  modal:       null,         // null | 'addFood' | 'editEntry' | 'addFoodDB' | 'editFoodDB'
-  md:          {},           // modal context data
-  searchQ:     '',           // food search in modal
-  foodsSearch: '',           // food search in foods tab
-  settingsEdit: null,        // null | 'sport' | 'rest'
+  viewDate:    '',
+  histSub:     'list',
+  editDate:    null,
+  modal:       null,         // null | 'addFood' | 'editEntry' | 'addFoodDB' | 'editFoodDB' | 'quickAdd' | 'addMeal' | 'editMeal' | 'exportData'
+  md:          {},
+  searchQ:     '',
+  foodsSearch: '',
+  foodsSubTab: 'foods',      // 'foods' | 'meals'
+  settingsEdit: null,
   settingsTemp: {},
   days:        {},
   foods:       [],
+  meals:       [],           // repas favoris : { id, name, items: [{foodId, grams}] }
   goals:       {}
 };
 
@@ -33,8 +35,8 @@ let S = {
 function load() {
   S.days  = JSON.parse(localStorage.getItem('macros_days')  || '{}');
   S.foods = JSON.parse(localStorage.getItem('macros_foods') || '[]');
+  S.meals = JSON.parse(localStorage.getItem('macros_meals') || '[]');
   S.goals = JSON.parse(localStorage.getItem('macros_goals') || JSON.stringify(DEFAULT_GOALS));
-  // Ensure goals have both types
   if (!S.goals.sport) S.goals.sport = { ...DEFAULT_GOALS.sport };
   if (!S.goals.rest)  S.goals.rest  = { ...DEFAULT_GOALS.rest  };
 }
@@ -42,6 +44,7 @@ function load() {
 function save() {
   localStorage.setItem('macros_days',  JSON.stringify(S.days));
   localStorage.setItem('macros_foods', JSON.stringify(S.foods));
+  localStorage.setItem('macros_meals', JSON.stringify(S.meals));
   localStorage.setItem('macros_goals', JSON.stringify(S.goals));
 }
 
@@ -233,6 +236,8 @@ function renderDayView(date) {
       <div class="meal-header">
         <span class="meal-title">Repas ${m}</span>
         <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
+        <button class="btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide">⚡</button>
+        <button class="btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori">★</button>
         <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}">+ Ajouter</button>
       </div>
       ${entriesHtml}
@@ -326,6 +331,11 @@ function renderHistory() {
 // ── Tab: Aliments ─────────────────────────────────────────────
 
 function renderFoods() {
+  if (S.foodsSubTab === 'meals') return renderFoodsMeals();
+  return renderFoodsAliments();
+}
+
+function renderFoodsAliments() {
   const q        = S.foodsSearch || '';
   const filtered = q.length > 0
     ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
@@ -350,9 +360,47 @@ function renderFoods() {
       <h2>Aliments</h2>
       <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
     </div>
+    <div class="subtab-row">
+      <button class="subtab-btn active" data-action="setFoodsSubTab" data-val="foods">Aliments</button>
+      <button class="subtab-btn" data-action="setFoodsSubTab" data-val="meals">Repas favoris</button>
+    </div>
     <input class="search-input" type="search" placeholder="Rechercher dans ma base…"
       value="${escHtml(q)}" data-action="searchFoods" autocomplete="off">
     ${rows || '<p class="empty-state">Aucun aliment.<br>Appuie sur <strong>+ Nouveau</strong> pour commencer !</p>'}
+  </div>`;
+}
+
+function renderFoodsMeals() {
+  const mealCards = S.meals.map(m => {
+    const totals = calcMacros(m.items);
+    const itemNames = m.items.map(it => {
+      const f = S.foods.find(x => x.id === it.foodId);
+      return f ? `${f.name} (${it.grams}g)` : '';
+    }).filter(Boolean).join(', ');
+    return `
+    <div class="food-card" data-action="editMeal" data-id="${m.id}">
+      <div class="food-name">${escHtml(m.name)}</div>
+      <div class="food-macros" style="margin-bottom:4px">
+        <span class="food-kcal">${totals.kcal} kcal</span>
+        <span style="color:#c8d8f0">P ${totals.p}g</span>
+        <span style="color:#f0c040">G ${totals.g}g</span>
+        <span style="color:#e87070">L ${totals.l}g</span>
+      </div>
+      <div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(itemNames)}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="view-foods">
+    <div class="foods-header">
+      <h2>Repas favoris</h2>
+      <button class="btn-primary-sm" data-action="openAddMeal">+ Nouveau</button>
+    </div>
+    <div class="subtab-row">
+      <button class="subtab-btn" data-action="setFoodsSubTab" data-val="foods">Aliments</button>
+      <button class="subtab-btn active" data-action="setFoodsSubTab" data-val="meals">Repas favoris</button>
+    </div>
+    ${mealCards || '<p class="empty-state">Aucun repas favori.<br>Crée-en un pour ajouter un repas complet en un tap !</p>'}
   </div>`;
 }
 
@@ -433,9 +481,15 @@ function renderSettings() {
       <div class="settings-block-head">
         <span class="settings-label">Export des données</span>
       </div>
+      <div style="font-size:12px;color:#666;margin-bottom:10px">Historique des jours</div>
+      <div class="export-row" style="margin-bottom:10px">
+        <button class="btn-export" data-action="exportHistoryCSV">⬇ CSV Historique</button>
+        <button class="btn-export" data-action="exportHistoryJSON">⬇ JSON Historique</button>
+      </div>
+      <div style="font-size:12px;color:#666;margin-bottom:10px">Ma base d'aliments</div>
       <div class="export-row">
-        <button class="btn-export" data-action="exportCSV">⬇ Exporter CSV</button>
-        <button class="btn-export" data-action="exportJSON">⬇ Exporter JSON</button>
+        <button class="btn-export" data-action="exportFoodsCSV">⬇ CSV Aliments</button>
+        <button class="btn-export" data-action="exportFullJSON">⬇ JSON Complet</button>
       </div>
     </div>
 
@@ -459,6 +513,10 @@ function renderModal() {
     case 'editEntry':  content = renderEditEntryModal();  break;
     case 'addFoodDB':  content = renderAddFoodDBModal();  break;
     case 'editFoodDB': content = renderEditFoodDBModal(); break;
+    case 'quickAdd':   content = renderQuickAddModal();   break;
+    case 'addMeal':    content = renderAddMealModal();    break;
+    case 'editMeal':   content = renderEditMealModal();   break;
+    case 'addFavMeal': content = renderAddFavMealModal(); break;
     default: return '';
   }
   return `
@@ -686,6 +744,157 @@ function renderEditFoodDBModal() {
     <button class="btn-delete" data-action="deleteFoodDB" data-id="${f.id}">Supprimer</button>
     <button class="btn-confirm" data-action="updateFoodDB" data-id="${f.id}">Enregistrer</button>
   </div>`;
+}
+
+// ── Modal: Quick Add ─────────────────────────────────────────
+
+function renderQuickAddModal() {
+  const { meal } = S.md;
+  const d = S.md;
+  return `
+  <h3 class="modal-title">⚡ Ajout rapide — Repas ${meal}</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:14px">Estime les macros sans passer par ta base d'aliments.</p>
+  <div class="form-group">
+    <label>Nom du plat (optionnel)</label>
+    <input type="text" class="form-input" id="qa-name"
+      value="${escHtml(d.qaName || '')}" placeholder="ex : Pancakes brunch, Riz poulet…" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label>Calories (kcal)</label>
+    <input type="number" class="form-input" id="qa-kcal"
+      value="${d.qaKcal || ''}" placeholder="500" inputmode="decimal">
+  </div>
+  <div class="form-row-3">
+    <div class="form-group">
+      <label>Protéines (g)</label>
+      <input type="number" class="form-input" id="qa-p"
+        value="${d.qaP || ''}" placeholder="25" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Glucides (g)</label>
+      <input type="number" class="form-input" id="qa-g"
+        value="${d.qaG || ''}" placeholder="60" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Lipides (g)</label>
+      <input type="number" class="form-input" id="qa-l"
+        value="${d.qaL || ''}" placeholder="15" inputmode="decimal">
+    </div>
+  </div>
+  <button class="btn-confirm nav-spacer" data-action="confirmQuickAdd">Ajouter au Repas ${meal}</button>`;
+}
+
+// ── Modal: Add Fav Meal to a repas ──────────────────────────
+
+function renderAddFavMealModal() {
+  const { meal } = S.md;
+  if (!S.meals.length) {
+    return `
+    <h3 class="modal-title">★ Repas favoris</h3>
+    <p class="empty-state" style="padding:24px 0">Aucun repas favori.<br>Crée-en un dans l'onglet <strong>Aliments</strong>.</p>
+    <button class="btn-confirm nav-spacer" data-action="closeModal" style="opacity:0.4">Fermer</button>`;
+  }
+  const cards = S.meals.map(m => {
+    const totals = calcMacros(m.items);
+    return `
+    <div class="food-item" data-action="addFavMealToRepas" data-meal-id="${m.id}">
+      <div>
+        <span class="food-item-name">${escHtml(m.name)}</span>
+        <div style="font-size:12px;color:#666;margin-top:2px">
+          ${totals.kcal} kcal · P ${totals.p}g · G ${totals.g}g · L ${totals.l}g
+        </div>
+      </div>
+      <span style="font-size:12px;color:#c8d8f0;font-weight:600">+ Ajouter</span>
+    </div>`;
+  }).join('');
+  return `
+  <h3 class="modal-title">★ Repas favoris — Repas ${meal}</h3>
+  <div class="food-list" style="max-height:65vh">${cards}</div>
+  <div style="height:69px"></div>`;
+}
+
+// ── Modal: Create/Edit Fav Meal ───────────────────────────────
+
+function renderAddMealModal() {
+  const items = S.md.mealItems || [];
+  const totals = calcMacros(items);
+  // Build item rows
+  const itemRows = items.map((it, i) => {
+    const f = S.foods.find(x => x.id === it.foodId);
+    if (!f) return '';
+    return `
+    <div class="meal-entry" style="border-radius:10px;background:#1a1a1a;margin-bottom:6px;border:1px solid rgba(255,255,255,0.07)">
+      <div class="entry-left">
+        <span class="entry-name">${escHtml(f.name)}</span>
+        <div class="entry-macros-row">
+          <span class="entry-macro-p">P ${+(f.p * it.grams / 100).toFixed(1)}g</span>
+          <span class="entry-macro-g">G ${+(f.g * it.grams / 100).toFixed(1)}g</span>
+          <span class="entry-macro-l">L ${+(f.l * it.grams / 100).toFixed(1)}g</span>
+        </div>
+      </div>
+      <div class="entry-right">
+        <span class="entry-qty">${it.grams}g</span>
+        <button class="btn-delete" style="padding:2px 8px;font-size:12px;border-radius:6px" data-action="removeMealItem" data-idx="${i}">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Food search for adding items
+  const q = S.md.mealSearchQ || '';
+  const searchList = q.length >= 1
+    ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8)
+    : [];
+  const searchItems = searchList.map(f => `
+    <div class="food-item" data-action="selectMealIngredient" data-id="${f.id}">
+      <span class="food-item-name">${escHtml(f.name)}</span>
+      <span class="food-item-kcal">${f.kcal} kcal</span>
+    </div>`).join('');
+
+  // If an ingredient is selected, show qty input
+  const selIngr = S.md.selectedIngredient;
+  const ingrSection = selIngr
+    ? `<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.07)">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px">${escHtml(selIngr.name)}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" class="qty-input" id="meal-ingr-qty"
+            value="${S.md.ingrQty || 100}" min="1" inputmode="decimal" style="margin-bottom:0;flex:1;font-size:18px;padding:10px">
+          <span style="color:#666;font-size:14px">g</span>
+          <button class="btn-save" style="flex-shrink:0" data-action="confirmMealIngredient">Ajouter</button>
+        </div>
+       </div>`
+    : `<input class="search-input" id="meal-ingr-search" type="search"
+        placeholder="Ajouter un ingrédient…" value="${escHtml(q)}"
+        data-action="searchMealIngredient" autocomplete="off" style="margin-bottom:8px">
+       <div class="food-list" style="max-height:25vh">${searchItems}</div>`;
+
+  return `
+  <h3 class="modal-title">${S.md.mealId ? 'Modifier le repas' : 'Nouveau repas favori'}</h3>
+  <div class="form-group">
+    <label>Nom du repas</label>
+    <input type="text" class="form-input" id="meal-name"
+      value="${escHtml(S.md.mealName || '')}" placeholder="ex : Bol protéiné, Brunch dominical…" autocomplete="off">
+  </div>
+  <div class="macros-summary-inline" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <span style="font-size:14px;font-weight:700;color:#e8e8e8">${totals.kcal} kcal</span>
+    <span style="font-size:13px;color:#c8d8f0">P ${totals.p}g</span>
+    <span style="font-size:13px;color:#f0c040">G ${totals.g}g</span>
+    <span style="font-size:13px;color:#e87070">L ${totals.l}g</span>
+  </div>
+  ${itemRows}
+  <div style="margin-top:12px;margin-bottom:4px;font-size:12px;color:#666">Ajouter un ingrédient</div>
+  ${ingrSection}
+  ${S.md.mealId
+    ? `<div class="modal-edit-actions nav-spacer">
+        <button class="btn-delete" data-action="deleteFavMeal" data-id="${S.md.mealId}">Supprimer</button>
+        <button class="btn-confirm" data-action="saveFavMeal">Enregistrer</button>
+       </div>`
+    : `<button class="btn-confirm nav-spacer" data-action="saveFavMeal">Enregistrer le repas</button>`
+  }`;
+}
+
+function renderEditMealModal() {
+  // Re-use addMealModal (state has mealId set)
+  return renderAddMealModal();
 }
 
 // ── Navigation Bar ────────────────────────────────────────────
@@ -1087,21 +1296,176 @@ function handleClick(e) {
       render();
       break;
 
-    // ── Export
-    case 'exportCSV':  exportCSV();  break;
-    case 'exportJSON': exportJSON(); break;
+    // ── Export (new split)
+    case 'exportHistoryCSV': exportHistoryCSV(); break;
+    case 'exportHistoryJSON': exportHistoryJSON(); break;
+    case 'exportFoodsCSV': exportFoodsCSV(); break;
+    case 'exportFullJSON': exportFullJSON(); break;
+    // legacy compat
+    case 'exportCSV':  exportHistoryCSV(); break;
+    case 'exportJSON': exportFullJSON();   break;
 
     // ── Barcode
     case 'scanBarcode': scanBarcode(); break;
 
+    // ── Foods tab sub-tab
+    case 'setFoodsSubTab':
+      S.foodsSubTab = el.dataset.val;
+      S.foodsSearch = '';
+      render();
+      break;
+
+    // ── Quick Add
+    case 'openQuickAdd':
+      S.modal = 'quickAdd';
+      S.md    = { meal: +el.dataset.meal, date: el.dataset.date };
+      render();
+      setTimeout(() => document.getElementById('qa-name')?.focus(), 80);
+      break;
+
+    case 'confirmQuickAdd': {
+      const { meal, date } = S.md;
+      const name  = document.getElementById('qa-name')?.value.trim() || 'Ajout rapide';
+      const kcal  = +document.getElementById('qa-kcal')?.value  || 0;
+      const p     = +document.getElementById('qa-p')?.value     || 0;
+      const g     = +document.getElementById('qa-g')?.value     || 0;
+      const l     = +document.getElementById('qa-l')?.value     || 0;
+      if (!kcal)  { showToast('Saisis au moins les calories.'); break; }
+      // Create a virtual food item (100g = les macros saisies, quantity = 100g)
+      const virtualFood = { id: uid(), name, kcal, p, g, l, unitWeight: null, _virtual: true };
+      S.foods.push(virtualFood);
+      const day = getDay(date);
+      day.meals[meal].push({ foodId: virtualFood.id, grams: 100 });
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast(`"${name}" ajouté !`);
+      render();
+      break;
+    }
+
+    // ── Fav Meals: open add from meal header
+    case 'openAddFavMeal':
+      S.modal = 'addFavMeal';
+      S.md    = { meal: +el.dataset.meal, date: el.dataset.date };
+      render();
+      break;
+
+    case 'addFavMealToRepas': {
+      const favMeal = S.meals.find(m => m.id === el.dataset.mealId);
+      if (!favMeal) break;
+      const { meal, date } = S.md;
+      const day = getDay(date);
+      for (const it of favMeal.items) {
+        day.meals[meal].push({ foodId: it.foodId, grams: it.grams });
+      }
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast(`"${favMeal.name}" ajouté au Repas ${meal} !`);
+      render();
+      break;
+    }
+
+    // ── Fav Meals: create/edit
+    case 'openAddMeal':
+      S.modal = 'addMeal';
+      S.md    = { mealItems: [], mealName: '', mealSearchQ: '' };
+      render();
+      setTimeout(() => document.getElementById('meal-name')?.focus(), 80);
+      break;
+
+    case 'editMeal': {
+      const m = S.meals.find(x => x.id === el.dataset.id);
+      if (!m) break;
+      S.modal = 'editMeal';
+      S.md    = { mealId: m.id, mealName: m.name, mealItems: JSON.parse(JSON.stringify(m.items)), mealSearchQ: '' };
+      render();
+      break;
+    }
+
+    case 'selectMealIngredient': {
+      const f = S.foods.find(x => x.id === el.dataset.id);
+      if (!f) break;
+      S.md.selectedIngredient = f;
+      S.md.ingrQty = 100;
+      render();
+      setTimeout(() => document.getElementById('meal-ingr-qty')?.focus(), 80);
+      break;
+    }
+
+    case 'confirmMealIngredient': {
+      const qty = +document.getElementById('meal-ingr-qty')?.value || 100;
+      if (!S.md.selectedIngredient) break;
+      S.md.mealItems = S.md.mealItems || [];
+      S.md.mealItems.push({ foodId: S.md.selectedIngredient.id, grams: qty });
+      S.md.selectedIngredient = null;
+      S.md.mealSearchQ = '';
+      render();
+      break;
+    }
+
+    case 'removeMealItem': {
+      const idx = +el.dataset.idx;
+      S.md.mealItems.splice(idx, 1);
+      render();
+      break;
+    }
+
+    case 'saveFavMeal': {
+      const name  = document.getElementById('meal-name')?.value.trim();
+      const items = S.md.mealItems || [];
+      if (!name)        { showToast('Donne un nom au repas.'); break; }
+      if (!items.length){ showToast('Ajoute au moins un ingrédient.'); break; }
+      if (S.md.mealId) {
+        const m = S.meals.find(x => x.id === S.md.mealId);
+        if (m) { m.name = name; m.items = items; }
+      } else {
+        S.meals.push({ id: uid(), name, items });
+      }
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast(`Repas "${name}" enregistré !`);
+      render();
+      break;
+    }
+
+    case 'deleteFavMeal': {
+      const id = el.dataset.id;
+      S.meals = S.meals.filter(x => x.id !== id);
+      save();
+      S.modal = null;
+      S.md    = {};
+      showToast('Repas supprimé.');
+      render();
+      break;
+    }
+
     // ── Foods tab search
-    case 'searchFoods': break; // handled in handleInput
+    case 'searchFoods': break;
   }
 }
 
 function handleInput(e) {
   const el = e.target;
   const a  = el.dataset.action;
+
+  if (a === 'searchMealIngredient') {
+    S.md.mealSearchQ = el.value;
+    const q = S.md.mealSearchQ;
+    const searchList = q.length >= 1
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8)
+      : [];
+    const searchItems = searchList.map(f => `
+      <div class="food-item" data-action="selectMealIngredient" data-id="${f.id}">
+        <span class="food-item-name">${escHtml(f.name)}</span>
+        <span class="food-item-kcal">${f.kcal} kcal</span>
+      </div>`).join('');
+    const fl = document.querySelector('.food-list');
+    if (fl) fl.innerHTML = searchItems;
+    return;
+  }
 
   if (a === 'filterFoods') {
     S.searchQ = el.value;
@@ -1196,7 +1560,7 @@ function updateMacrosPreview() {
 
 // ── Export ────────────────────────────────────────────────────
 
-function exportCSV() {
+function exportHistoryCSV() {
   const header = ['Date', 'Type', 'Calories', 'Protéines (g)', 'Glucides (g)', 'Lipides (g)'];
   const rows   = Object.entries(S.days)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -1205,19 +1569,42 @@ function exportCSV() {
       return [date, day.type, t.kcal, t.p, t.g, t.l].join(',');
     });
   const csv = [header.join(','), ...rows].join('\n');
-  download('macros-export.csv', csv, 'text/csv;charset=utf-8;');
-  showToast('Export CSV téléchargé !');
+  download('macros-historique.csv', csv, 'text/csv;charset=utf-8;');
+  showToast('Historique CSV exporté !');
 }
 
-function exportJSON() {
+function exportHistoryJSON() {
+  const data = { exportDate: new Date().toISOString(), days: S.days, goals: S.goals };
+  download('macros-historique.json', JSON.stringify(data, null, 2), 'application/json');
+  showToast('Historique JSON exporté !');
+}
+
+function exportFoodsCSV() {
+  // Same format as foods.csv so it can be re-imported
+  const header = 'Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire';
+  const rows = S.foods
+    .filter(f => !f._virtual) // skip quick-add virtual entries
+    .map(f => {
+      const sep   = f.name.indexOf(' — ');
+      const marque = sep > -1 ? f.name.slice(0, sep) : '';
+      const nom    = sep > -1 ? f.name.slice(sep + 3) : f.name;
+      return [marque, nom, f.kcal, f.p, f.g, f.l, f.unitWeight || ''].join(',');
+    });
+  const csv = [header, ...rows].join('\n');
+  download('macros-aliments.csv', csv, 'text/csv;charset=utf-8;');
+  showToast('Aliments CSV exporté !');
+}
+
+function exportFullJSON() {
   const data = {
     exportDate: new Date().toISOString(),
     days:  S.days,
     foods: S.foods,
+    meals: S.meals,
     goals: S.goals
   };
-  download('macros-export.json', JSON.stringify(data, null, 2), 'application/json');
-  showToast('Export JSON téléchargé !');
+  download('macros-complet.json', JSON.stringify(data, null, 2), 'application/json');
+  showToast('Export complet JSON téléchargé !');
 }
 
 function download(filename, content, mime) {

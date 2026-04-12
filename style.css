@@ -238,6 +238,47 @@ h2 {
   border-radius: 8px;
   background: rgba(200,216,240,0.1);
 }
+.btn-quick-add {
+  font-size: 14px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: rgba(240,192,64,0.1);
+  color: #f0c040;
+}
+.btn-quick-add:active { background: rgba(240,192,64,0.2); }
+.btn-add-meal-fav {
+  font-size: 14px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: rgba(102,255,170,0.08);
+  color: #66ffaa;
+}
+.btn-add-meal-fav:active { background: rgba(102,255,170,0.16); }
+
+/* ─── Sub-tabs ───────────────────────────────────────────────── */
+.subtab-row {
+  display: flex;
+  gap: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.subtab-btn {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text3);
+  transition: all 0.15s;
+  text-align: center;
+}
+.subtab-btn.active {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  font-weight: 600;
+}
 .meal-entry {
   display: flex;
   align-items: center;
