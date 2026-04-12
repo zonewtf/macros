@@ -1,4 +1,6 @@
-const CACHE = 'macros-v5';
+const VERSION = 'v5'; // <--- C'est le SEUL endroit à MAJ
+const CACHE = `macros-${VERSION}`;
+
 const ASSETS = [
   './',
   './index.html',
