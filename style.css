@@ -44,7 +44,8 @@ input { font: inherit; color: inherit; }
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: calc(var(--safe-t) + 16px) calc(16px + var(--safe-l)) calc(var(--nav-h) + var(--safe-b) + 32px) calc(16px + var(--safe-r));
+  /* padding-bottom: 160px couvre nav (60px) + home indicator (34px) + Safari toolbar (50px) + marge */
+  padding: calc(var(--safe-t) + 16px) 16px 160px 16px;
 }
 #nav {
   position: fixed;

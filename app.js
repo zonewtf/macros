@@ -428,7 +428,7 @@ function renderModal() {
   }
   return `
   <div class="modal-overlay" data-action="closeModal">
-    <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-sheet" data-action="noop">
       <div class="modal-handle"></div>
       ${content}
     </div>
@@ -459,12 +459,9 @@ function renderAddFoodModal() {
 
     return `
     <h3 class="modal-title">Repas ${meal}</h3>
-    <div class="modal-search-wrap">
-      <input id="food-search" class="search-input" type="search"
-        placeholder="Rechercher un aliment…" value="${escHtml(q)}"
-        data-action="filterFoods" autocomplete="off" autocorrect="off">
-      <button class="btn-scan" data-action="scanBarcode" title="Scanner code-barres">📷</button>
-    </div>
+    <input id="food-search" class="search-input" type="search"
+      placeholder="Rechercher un aliment…" value="${escHtml(q)}"
+      data-action="filterFoods" autocomplete="off" autocorrect="off">
     <div class="food-list">
       ${items || (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>')}
       ${items && q ? addNew : ''}
@@ -690,15 +687,15 @@ function render() {
   const modal  = S.modal ? renderModal() : '';
   const app    = document.getElementById('app');
   app.innerHTML = view + modal;
-  bindEvents();
 }
 
 // ── Event Handling ────────────────────────────────────────────
 
 function bindEvents() {
+  // Called ONCE from init — event delegation on persistent #app element
   const app = document.getElementById('app');
-  app.addEventListener('click', handleClick, { passive: false });
-  app.addEventListener('input', handleInput, { passive: true });
+  app.addEventListener('click', handleClick);
+  app.addEventListener('input', handleInput);
 }
 
 function handleClick(e) {
@@ -750,11 +747,16 @@ function handleClick(e) {
       setTimeout(() => document.getElementById('food-search')?.focus(), 80);
       break;
 
+    case 'noop': break; // modal-sheet click stopper
+
     case 'closeModal':
-      S.modal = null;
-      S.md    = {};
-      S.searchQ = '';
-      render();
+      // Only close when clicking the dark backdrop, not inside the sheet
+      if (!e.target.closest('.modal-sheet')) {
+        S.modal = null;
+        S.md    = {};
+        S.searchQ = '';
+        render();
+      }
       break;
 
     case 'selectFood': {
@@ -1050,7 +1052,7 @@ function handleInput(e) {
       fl.innerHTML = items
         ? items + (q ? addNew : '')
         : (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>');
-      fl.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', handleClick));
+      // No manual binding needed — #app delegated listener handles everything
     }
     return;
   }
@@ -1081,11 +1083,7 @@ function handleInput(e) {
     if (container) {
       const div = document.createElement('div');
       div.innerHTML = rows || '<p class="empty-state">Aucun résultat.</p>';
-      Array.from(div.children).forEach(child => {
-        container.appendChild(child);
-        child.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', handleClick));
-        if (child.dataset.action) child.addEventListener('click', handleClick);
-      });
+      Array.from(div.children).forEach(child => container.appendChild(child));
     }
     return;
   }
@@ -1300,6 +1298,7 @@ async function init() {
   getDay(S.viewDate);
   render();
   renderNav();
+  bindEvents(); // single call — event delegation on #app
   // Load CSV in background — re-render foods tab if needed
   await loadCSVFoods();
   if (S.tab === 'foods') render();
