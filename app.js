@@ -578,6 +578,11 @@ function renderAddFoodDBModal() {
   return `
   <h3 class="modal-title">Nouvel aliment</h3>
   <div class="form-group">
+    <label>Marque (optionnel)</label>
+    <input type="text" class="form-input" id="db-brand"
+      value="${escHtml(d.brand || '')}" placeholder="ex : Danone, Prozis…" autocomplete="off">
+  </div>
+  <div class="form-group">
     <label>Nom de l'aliment</label>
     <input type="text" class="form-input" id="db-name"
       value="${escHtml(d.name || '')}" placeholder="ex : Poulet grillé" autocomplete="off">
@@ -615,11 +620,19 @@ function renderAddFoodDBModal() {
 function renderEditFoodDBModal() {
   const f = S.foods.find(x => x.id === S.md.foodId);
   if (!f) return '<p style="padding:20px;color:#888">Introuvable.</p>';
+  // Extract brand and name (stored as "Marque — Nom" or just "Nom")
+  const sep   = f.name.indexOf(' — ');
+  const brand = sep > -1 ? f.name.slice(0, sep) : '';
+  const nom   = sep > -1 ? f.name.slice(sep + 3) : f.name;
   return `
-  <h3 class="modal-title">Modifier — ${escHtml(f.name)}</h3>
+  <h3 class="modal-title">Modifier un aliment</h3>
+  <div class="form-group">
+    <label>Marque (optionnel)</label>
+    <input type="text" class="form-input" id="db-brand" value="${escHtml(brand)}" placeholder="ex : Danone, Prozis…" autocomplete="off">
+  </div>
   <div class="form-group">
     <label>Nom</label>
-    <input type="text" class="form-input" id="db-name" value="${escHtml(f.name)}" autocomplete="off">
+    <input type="text" class="form-input" id="db-name" value="${escHtml(nom)}" autocomplete="off">
   </div>
   <div class="form-group">
     <label>Calories (kcal/100g)</label>
@@ -643,7 +656,7 @@ function renderEditFoodDBModal() {
     <label>Poids unitaire (g/unité)</label>
     <input type="number" class="form-input" id="db-unit" value="${f.unitWeight || ''}" inputmode="decimal">
   </div>
-  <div class="modal-edit-actions">
+  <div class="modal-edit-actions nav-spacer">
     <button class="btn-delete" data-action="deleteFoodDB" data-id="${f.id}">Supprimer</button>
     <button class="btn-confirm" data-action="updateFoodDB" data-id="${f.id}">Enregistrer</button>
   </div>`;
@@ -934,19 +947,20 @@ function handleClick(e) {
     }
 
     case 'saveFoodDB': {
-      const name = document.getElementById('db-name')?.value.trim();
-      const kcal = +document.getElementById('db-kcal')?.value;
-      const p    = +document.getElementById('db-p')?.value    || 0;
-      const g    = +document.getElementById('db-g')?.value    || 0;
-      const l    = +document.getElementById('db-l')?.value    || 0;
-      const uw   = +document.getElementById('db-unit')?.value || null;
-      if (!name)  { showToast('Donne un nom à l\'aliment.'); break; }
-      if (!kcal)  { showToast('Les calories sont requises.'); break; }
-      const food = { id: uid(), name, kcal, p, g, l, unitWeight: uw || null };
+      const brand = document.getElementById('db-brand')?.value.trim() || '';
+      const nom   = document.getElementById('db-name')?.value.trim()  || '';
+      const kcal  = +document.getElementById('db-kcal')?.value;
+      const p     = +document.getElementById('db-p')?.value    || 0;
+      const g     = +document.getElementById('db-g')?.value    || 0;
+      const l     = +document.getElementById('db-l')?.value    || 0;
+      const uw    = +document.getElementById('db-unit')?.value || null;
+      if (!nom)  { showToast('Donne un nom à l\'aliment.'); break; }
+      if (!kcal) { showToast('Les calories sont requises.'); break; }
+      const fullName = brand ? `${brand} — ${nom}` : nom;
+      const food = { id: uid(), name: fullName, kcal, p, g, l, unitWeight: uw || null };
       S.foods.push(food);
       save();
       if (S.md.pendingMeal) {
-        // Return to add food modal with new food pre-selected
         S.modal = 'addFood';
         S.md    = {
           meal:         S.md.pendingMeal,
@@ -959,7 +973,7 @@ function handleClick(e) {
         S.modal = null;
         S.md    = {};
       }
-      showToast(`"${name}" ajouté à ta base !`);
+      showToast(`"${fullName}" ajouté à ta base !`);
       render();
       break;
     }
@@ -972,15 +986,18 @@ function handleClick(e) {
       break;
 
     case 'updateFoodDB': {
-      const id = el.dataset.id;
-      const f  = S.foods.find(x => x.id === id);
+      const id    = el.dataset.id;
+      const f     = S.foods.find(x => x.id === id);
       if (!f) break;
-      f.name       = document.getElementById('db-name')?.value.trim() || f.name;
-      f.kcal       = +document.getElementById('db-kcal')?.value       || f.kcal;
-      f.p          = +document.getElementById('db-p')?.value          || 0;
-      f.g          = +document.getElementById('db-g')?.value          || 0;
-      f.l          = +document.getElementById('db-l')?.value          || 0;
-      f.unitWeight = +document.getElementById('db-unit')?.value       || null;
+      const brand = document.getElementById('db-brand')?.value.trim() || '';
+      const nom   = document.getElementById('db-name')?.value.trim()  || '';
+      if (!nom) { showToast('Le nom est requis.'); break; }
+      f.name       = brand ? `${brand} — ${nom}` : nom;
+      f.kcal       = +document.getElementById('db-kcal')?.value || f.kcal;
+      f.p          = +document.getElementById('db-p')?.value    || 0;
+      f.g          = +document.getElementById('db-g')?.value    || 0;
+      f.l          = +document.getElementById('db-l')?.value    || 0;
+      f.unitWeight = +document.getElementById('db-unit')?.value || null;
       save();
       S.modal = null;
       S.md    = {};
