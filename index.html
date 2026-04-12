@@ -24,21 +24,23 @@
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
+    let refreshing = false;
+
+    // Détecte quand le nouveau SW prend le contrôle et rafraîchit la page
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        window.location.reload();
+        refreshing = true;
+      }
+    });
+
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
         .then(reg => {
-          reg.update(); 
-
-          reg.onupdatefound = () => {
-            const installingWorker = reg.installing;
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                alert("MAJ ! Kill & Restart app.");
-              }
-            };
-          };
+          // Vérifie s'il y a une MAJ au lancement
+          reg.update();
         })
-        .catch(err => console.warn('Erreur SW:', err));
+        .catch(err => console.warn('SW Erreur:', err));
     });
   }
 </script>

@@ -364,12 +364,14 @@ function renderSettings() {
     const editing = S.settingsEdit === type;
     const t       = S.settingsTemp;
     const label   = type === 'sport' ? 'Jour Sport ⚡' : 'Jour Repos 🌙';
-    const fields  = [
+    
+    const fields = [
       { key: 'kcal', label: 'Calories (kcal)' },
       { key: 'p',    label: 'Protéines (g)' },
       { key: 'g',    label: 'Glucides (g)' },
       { key: 'l',    label: 'Lipides (g)' }
     ];
+
     if (editing) {
       return `
       <div class="settings-block">
@@ -388,6 +390,7 @@ function renderSettings() {
         </div>`).join('')}
       </div>`;
     }
+
     return `
     <div class="settings-block">
       <div class="settings-block-head">
@@ -403,10 +406,13 @@ function renderSettings() {
     </div>`;
   }).join('');
 
+  // C'est ici qu'on assemble tout le HTML final
   return `
   <div class="view-settings">
     <h2>Réglages</h2>
+    
     ${blocks}
+
     <div class="settings-block">
       <div class="settings-block-head">
         <span class="settings-label">Export des données</span>
@@ -416,9 +422,13 @@ function renderSettings() {
         <button class="btn-export" data-action="exportJSON">⬇ Exporter JSON</button>
       </div>
     </div>
-    <div class="settings-block" style="margin-top:4px">
-      <div class="settings-block-head">
-        <span class="settings-label" style="color:#555;font-size:12px">Version 1.0 — Mes Macros</span>
+
+    <div style="margin-top: 32px; text-align: center; padding-bottom: 20px;">
+      <div style="color: #555; font-size: 12px; font-weight: 500;">
+        MES MACROS — Version 6.0
+      </div>
+      <div style="color: #333; font-size: 10px; margin-top: 4px;">
+        PWA Stable & Auto-update
       </div>
     </div>
   </div>`;
