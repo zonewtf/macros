@@ -1,71 +1,79 @@
 Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire
-,Riz blanc cuit,130,2.7,28,0.3,
-,Riz complet cuit,111,2.6,23,0.9,
-,Pâtes cuites,158,5.8,30,1,
-,Patate douce cuite,86,1.6,20,0.1,
-,Pomme de terre cuite,77,2,17,0.1,
-,Avoine flocons,379,13,59,7,
-,Pain complet,247,9,43,3.5,
-,Pain de seigle,259,8.5,48,1.7,
-,Tortilla de blé,306,8,54,6,
-,Quinoa cuit,120,4.4,21,1.9,
-,Lentilles cuites,116,9,20,0.4,
-,Pois chiches cuits,164,8.9,27,2.6,
-,Haricots noirs cuits,132,8.9,24,0.5,
-,Blanc de poulet,110,23,0,1.5,
-,Escalope de dinde,104,22,0,1.2,
-,Filet de saumon,208,20,0,14,
-,Thon en boîte au naturel,116,26,0,1,
-,Sardines à l'huile,208,22,0,13,
-,Crevettes cuites,99,21,0.9,1.1,
-,Steak haché 5%,121,21,0,3.8,
-,Steak haché 15%,175,19,0,11,
-,Œuf entier,155,13,1.1,11,60
-,Blanc d'œuf,52,11,0.7,0.2,35
-,Fromage blanc 0%,46,8,4.7,0.1,
-,Fromage blanc 3%,65,7.4,4.5,2.1,
-,Yaourt nature 0%,48,4.7,6.9,0.1,125
-,Skyr nature,63,10,4,0.2,150
-,Lait écrémé,35,3.4,4.9,0.1,
-,Lait demi-écrémé,46,3.2,4.8,1.6,
-,Lait entier,61,3.2,4.8,3.3,
-Danone,Activia nature,72,4.2,8.1,2.3,125
-Danone,Danette chocolat,118,3.5,18,3.4,125
-,Mozzarella,280,18,2.7,22,
-,Feta,264,14,4,21,
-,Emmental râpé,382,29,1.3,30,
-,Parmesan,431,38,0,30,
-,Tofu ferme,76,8,1.9,4.2,
-,Tempeh,195,19,9,11,
-,Tomate,18,0.9,3.5,0.2,
-,Concombre,12,0.7,1.8,0.1,
-,Courgette cuite,19,1.5,3,0.2,
-,Épinards cuits,23,2.9,1.4,0.3,
-,Brocoli cuit,35,3.7,4,0.4,
-,Haricots verts cuits,31,2,5.7,0.2,
-,Poivron rouge,31,1,6.3,0.3,
-,Oignon,40,1.1,9.3,0.1,
-,Ail,149,6.4,33,0.5,
-,Champignons de Paris,22,3.1,3.3,0.3,
-,Avocat,160,2,1.8,15,
-,Banane,89,1.1,23,0.3,120
-,Pomme,52,0.3,14,0.2,180
-,Orange,47,0.9,12,0.1,200
-,Fraises,32,0.7,7.7,0.3,
-,Myrtilles,57,0.7,14,0.3,
-,Noix,654,15,14,65,
-,Amandes,575,21,22,49,
-,Cacahuètes,567,26,16,49,
-,Beurre de cacahuète,598,25,20,51,
-,Huile d'olive,884,0,0,100,
-,Huile de coco,892,0,0,99,
-,Beurre,717,0.7,0.6,81,
-,Miel,304,0.3,82,0,
-,Confiture standard,250,0.6,65,0.1,
-,Sauce tomate,50,2,9,0.5,
-,Lait de coco,230,2.3,3.3,23,
-Prozis,Whey protéine,388,80,7,7,
-Prozis,Caséine,384,82,4,5,
-Prozis,Crêpes protéinées,369,35,40,7,
-,Granola nature,450,10,64,18,
-,Flocons d'avoine protéinés,390,22,55,8,
+Prozis,100% Real Whey Unflavored,494,76,3.4,8.5,
+,Amande,595,21.0,10.0,52.0,1.2
+,Avocat,160,2.0,8.5,14.7,180
+,Banane,90,1.1,20.0,0.3,120
+,Bavette d'aloyau,150,21.0,0.0,7.5,
+,Beurre,717,0.8,0.1,81.0,10
+,Beurre de Cacahuète (Pur),595,25.0,12.0,50.0,15
+,Bifteck de boeuf,115,23.0,0.0,2.5,
+,Blanc d'oeuf (liquide),48,11.0,0.7,0.2,35
+,Blanc de poulet,102,23.0,0.0,1.0,150
+,Boulgour,345,12.0,65.0,1.5,
+,Brocoli,34,2.8,4.0,0.4,
+,Cabillaud (Dos),75,18.0,0.0,0.5,140
+,Carpaccio de boeuf,110,20.0,0.0,3.0,70
+,Caséine,365,80.0,5.0,1.5,30
+,Colin / Lieu noir,85,19.0,0.0,0.8,140
+,Cottage Cheese,95,11.0,3.0,4.0,
+,Courgette,17,1.2,2.5,0.2,200
+,Crevettes cuites,95,20.0,1.0,1.0,10
+,Crème de riz (poudre),360,7.0,80.0,1.0,
+,Cuisse de poulet (sans peau),120,19.0,0.0,4.5,120
+,Dorade,100,18.0,0.0,3.0,
+,Epinards,23,2.9,0.5,0.4,
+,Faux-filet de boeuf,140,22.0,0.0,5.5,
+,Filet de dinde,105,24.0,0.0,1.0,150
+,Filet mignon de porc (cru),110,22.0,0.0,2.5,
+,Flocons d'avoine,355,13.0,60.0,7.0,
+Prozis,Flocons d'avoine,365,12,68,7,
+,Fraises,33,0.7,6.0,0.3,12
+,Fromage Blanc 0%,48,8.0,4.0,0.0,100
+,Graines de Chia,485,17.0,42.0,31.0,
+,Graines de Courge,560,30.0,10.0,45.0,
+,Haricots verts,31,1.8,4.0,0.1,
+,Huile d'Olive,900,0.0,0.0,100.0,14
+,Huile de Coco,862,0.0,0.0,99.0,14
+,Huile de Colza,900,0.0,0.0,100.0,14
+,Jambon blanc découenné (-25% sel),105,21.0,1.0,2.0,40
+,Jaune d'oeuf,322,16.0,1.0,28.0,18
+,Kiwi,61,1.1,12.0,0.5,70
+,Lait Ecrémé,35,3.5,5.0,0.1,250
+,Lentilles corail (sec),315,25.0,50.0,1.5,
+,Lentilles vertes (sec),310,24.0,48.0,1.0,
+,Maquereau (frais),200,19.0,0.0,14.0,100
+,Noisette,630,15.0,11.0,60.0,1.3
+,Noix de Cajou,580,18.0,25.0,44.0,1.5
+,Noix de Grenoble,650,15.0,12.0,65.0,4
+,Noix du Brésil,660,14.0,12.0,67.0,4
+,Oeuf entier (Large - L 63-73g avec coquille),143,12.6,0.7,9.5,65
+,Oeuf entier (Moyen - M 53-63g avec coquille),143,12.6,0.7,9.5,55
+,Oeuf entier (Petit - S <53g avec coquille),143,12.6,0.7,9.5,45
+,Oeuf entier (XL >73g avec coquille),143,12.6,0.7,9.5,75
+,Patate douce (crue),86,1.6,20.0,0.1,200
+,Pistaches (sans coque),565,20.0,20.0,45.0,0.7
+,Pois chiches (sec),350,19.0,50.0,6.0,
+,Pomme,52,0.3,12.0,0.2,150
+,Pomme de terre (crue),77,2.0,17.0,0.1,150
+,Poulpe cuit,85,18.0,0.0,1.0,
+,Pâtes Blanches (sec),350,12.0,72.0,1.5,
+,Pâtes Complètes (sec),335,13.0,65.0,2.5,
+,Quinoa (sec),355,14.0,60.0,6.0,
+,Riz Basmati (sec),345,8.0,77.0,0.5,
+,Riz Complet (sec),345,8.0,72.0,2.5,
+,Riz Thaï (sec),350,7.5,78.0,1.0,
+,Rumsteck boeuf,120,23.0,0.0,3.0,
+,Sardines à l'huile d'olive,215,24.0,0.0,13.0,25
+,Sarrasin (Kasha),340,12.0,68.0,3.0,
+,Saumon (Pavé),200,20.0,0.0,13.0,125
+,Semoule de couscous (sec),350,12.0,72.0,1.0,
+,Skyr (Nature),57,10.0,4.0,0.2,140
+,Steak haché 10%,150,20.0,0.0,8.0,125
+,Steak haché 15%,175,19.0,0.0,11.0,125
+,Steak haché 5%,120,21.0,0.0,4.0,125
+,Thon au naturel (boite),110,25.0,0.0,1.0,140
+,Thon rouge (frais),135,24.0,0.0,4.0,
+,Tofu Ferme,120,12.0,2.0,7.0,100
+,Whey Isolate,370,85.0,3.0,1.5,30
+,Yaourt Grec Authentique,120,9.0,4.0,8.0,125
+Yummy,Yogurt Skim Plain,56,5,8.8,0,
