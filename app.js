@@ -186,8 +186,7 @@ function renderDayView(date) {
        </div>
        <h2 class="day-title">${isTomorrow ? 'Demain — ' : ''}${fmtDate(date)}</h2>`;
 
-  const overAlert = (totals.kcal > goals.kcal || totals.p > goals.p || totals.g > goals.g || totals.l > goals.l)
-    ? `<div class="over-alert">⚠️ Un ou plusieurs objectifs sont dépassés</div>` : '';
+  const overAlert = '';
 
   const summary = `
   <div class="summary-card">
