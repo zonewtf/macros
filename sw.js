@@ -1,4 +1,4 @@
-const CACHE = 'macros-v2';
+const CACHE = 'macros-v3';
 const ASSETS = [
   './',
   './index.html',

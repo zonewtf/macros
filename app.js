@@ -666,7 +666,7 @@ function renderEditFoodDBModal() {
 
 function renderNav() {
   const tabs = [
-    { id: 'today',    icon: '⬤',  label: "Aujourd'hui" },
+    { id: 'today',    icon: '⬤',  label: "TODAY" },
     { id: 'history',  icon: '◷',  label: 'Historique'  },
     { id: 'foods',    icon: '◈',  label: 'Aliments'    },
     { id: 'settings', icon: '◎', label: 'Réglages'    }
