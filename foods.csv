@@ -1,79 +1,84 @@
 Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire
 Prozis,100% Real Whey Unflavored,494,76,3.4,8.5,
-,Amande,595,21.0,10.0,52.0,1.2
-,Avocat,160,2.0,8.5,14.7,180
-,Banane,90,1.1,20.0,0.3,120
+,Amande,595,21.0,10.0,52.0,1.2,
+,Avocat,160,2.0,8.5,14.7,180,
+,Banane,90,1.1,20.0,0.3,120,
 ,Bavette d'aloyau,150,21.0,0.0,7.5,
-,Beurre,717,0.8,0.1,81.0,10
-,Beurre de Cacahuète (Pur),595,25.0,12.0,50.0,15
+,Beurre,717,0.8,0.1,81,
+,Beurre de Cacahuète (Pur),595,25.0,12.0,50.0,15,
 ,Bifteck de boeuf,115,23.0,0.0,2.5,
-,Blanc d'oeuf (liquide),48,11.0,0.7,0.2,35
-,Blanc de poulet,102,23.0,0.0,1.0,150
+,Blanc d'oeuf (liquide),48,11.0,0.7,0.2,35,
+,Blanc de poulet,102,23.0,0.0,1.0,150,
 ,Boulgour,345,12.0,65.0,1.5,
 ,Brocoli,34,2.8,4.0,0.4,
-,Cabillaud (Dos),75,18.0,0.0,0.5,140
-,Carpaccio de boeuf,110,20.0,0.0,3.0,70
-,Caséine,365,80.0,5.0,1.5,30
-,Colin / Lieu noir,85,19.0,0.0,0.8,140
+,Cabillaud (Dos),75,18.0,0.0,0.5,140,
+,Carpaccio de boeuf,110,20.0,0.0,3.0,70,
+,Caséine,365,80.0,5.0,1.5,30,
+,Colin / Lieu noir,85,19.0,0.0,0.8,140,
 ,Cottage Cheese,95,11.0,3.0,4.0,
-,Courgette,17,1.2,2.5,0.2,200
-,Crevettes cuites,95,20.0,1.0,1.0,10
+,Courgette,17,1.2,2.5,0.2,200,
+,Crevettes cuites,95,20.0,1.0,1.0,10,
 ,Crème de riz (poudre),360,7.0,80.0,1.0,
-,Cuisse de poulet (sans peau),120,19.0,0.0,4.5,120
+,Cuisse de poulet (sans peau),120,19.0,0.0,4.5,120,
 ,Dorade,100,18.0,0.0,3.0,
 ,Epinards,23,2.9,0.5,0.4,
 ,Faux-filet de boeuf,140,22.0,0.0,5.5,
-,Filet de dinde,105,24.0,0.0,1.0,150
+,Filet de dinde,105,24.0,0.0,1.0,150,
 ,Filet mignon de porc (cru),110,22.0,0.0,2.5,
 ,Flocons d'avoine,355,13.0,60.0,7.0,
 Prozis,Flocons d'avoine,365,12,68,7,
-,Fraises,33,0.7,6.0,0.3,12
-,Fromage Blanc 0%,48,8.0,4.0,0.0,100
+,Fraises,33,0.7,6.0,0.3,12,
+,Fromage Blanc 0%,48,8.0,4.0,0.0,100,
 ,Graines de Chia,485,17.0,42.0,31.0,
 ,Graines de Courge,560,30.0,10.0,45.0,
 ,Haricots verts,31,1.8,4.0,0.1,
-,Huile d'Olive,900,0.0,0.0,100.0,14
-,Huile de Coco,862,0.0,0.0,99.0,14
-,Huile de Colza,900,0.0,0.0,100.0,14
-,Jambon blanc découenné (-25% sel),105,21.0,1.0,2.0,40
-,Jaune d'oeuf,322,16.0,1.0,28.0,18
-,Kiwi,61,1.1,12.0,0.5,70
-,Lait Ecrémé,35,3.5,5.0,0.1,250
+,Huile d'Olive,900,0.0,0.0,100.0,14,
+,Huile de Coco,862,0.0,0.0,99.0,14,
+,Huile de Colza,900,0.0,0.0,100.0,14,
+,Huile de Sésame,884,0,0,100,
+Biotech USA,Iso Whey Zero Clear,349,85,0.9,0.5,
+,Jaune d'oeuf,322,16.0,1.0,28.0,18,
+,Kiwi,61,1.1,12.0,0.5,70,
+,Lait Ecrémé,35,3.5,5.0,0.1,250,
 ,Lentilles corail (sec),315,25.0,50.0,1.5,
 ,Lentilles vertes (sec),310,24.0,48.0,1.0,
-,Maquereau (frais),200,19.0,0.0,14.0,100
-,Noisette,630,15.0,11.0,60.0,1.3
-,Noix de Cajou,580,18.0,25.0,44.0,1.5
-,Noix de Grenoble,650,15.0,12.0,65.0,4
-,Noix du Brésil,660,14.0,12.0,67.0,4
-,Oeuf entier (Large - L 63-73g avec coquille),143,12.6,0.7,9.5,65
-,Oeuf entier (Moyen - M 53-63g avec coquille),143,12.6,0.7,9.5,55
-,Oeuf entier (Petit - S <53g avec coquille),143,12.6,0.7,9.5,45
-,Oeuf entier (XL >73g avec coquille),143,12.6,0.7,9.5,75
-,Patate douce (crue),86,1.6,20.0,0.1,200
-,Pistaches (sans coque),565,20.0,20.0,45.0,0.7
+,Maizena,355,0.5,86,0.5,
+,Maquereau (frais),200,19.0,0.0,14.0,100,
+,Noisette,630,15.0,11.0,60.0,1.3,
+,Noix de Cajou,580,18.0,25.0,44.0,1.5,
+,Noix de Grenoble,650,15.0,12.0,65.0,4,
+,Noix du Brésil,660,14.0,12.0,67.0,4,
+,Oeuf entier (L 63-73g),143,12.6,0.7,9.5,65,
+,Oeuf entier (M 53-63g),143,12.6,0.7,9.5,55,
+,Oeuf entier (S <53g),143,12.6,0.7,9.5,45,
+,Oeuf entier (XL >73g),143,12.6,0.7,9.5,75,
+,Patate douce (crue),86,1.6,20.0,0.1,200,
+Barilla,Pâtes (sec),359,12.5,71.2,2.0,
+Prozis,Peanut Butter Smooth,629,26,13,51,,
+,Pistaches (sans coque),565,20.0,20.0,45.0,0.7,
 ,Pois chiches (sec),350,19.0,50.0,6.0,
-,Pomme,52,0.3,12.0,0.2,150
-,Pomme de terre (crue),77,2.0,17.0,0.1,150
+,Pomme,52,0.3,12.0,0.2,150,
+,Pomme de terre (crue),77,2.0,17.0,0.1,150,
 ,Poulpe cuit,85,18.0,0.0,1.0,
 ,Pâtes Blanches (sec),350,12.0,72.0,1.5,
 ,Pâtes Complètes (sec),335,13.0,65.0,2.5,
+,Pâte de Miso,200,12,25,6,
 ,Quinoa (sec),355,14.0,60.0,6.0,
 ,Riz Basmati (sec),345,8.0,77.0,0.5,
 ,Riz Complet (sec),345,8.0,72.0,2.5,
 ,Riz Thaï (sec),350,7.5,78.0,1.0,
 ,Rumsteck boeuf,120,23.0,0.0,3.0,
-,Sardines à l'huile d'olive,215,24.0,0.0,13.0,25
-,Sarrasin (Kasha),340,12.0,68.0,3.0,
-,Saumon (Pavé),200,20.0,0.0,13.0,125
+,Sardines à l'huile d'olive,215,24.0,0.0,13.0,25,
+Barilla,Sauce Bolognese,84,4.5,7.7,3.6,
+,Sauce Soja,53,6,7.5,0.04,
+,Saumon (Pavé),200,20.0,0.0,13.0,125,
 ,Semoule de couscous (sec),350,12.0,72.0,1.0,
-,Skyr (Nature),57,10.0,4.0,0.2,140
-,Steak haché 10%,150,20.0,0.0,8.0,125
-,Steak haché 15%,175,19.0,0.0,11.0,125
-,Steak haché 5%,120,21.0,0.0,4.0,125
-,Thon au naturel (boite),110,25.0,0.0,1.0,140
+KoRo,Sirop d'Érable,367,0,90,0,
+,Skyr (Nature),57,10.0,4.0,0.2,140,
+,Steak haché 10%,150,20.0,0.0,8.0,125,
+,Steak haché 15%,175,19.0,0.0,11.0,125,
+,Steak haché 5%,120,21.0,0.0,4.0,125,
+,Thon au naturel (boite),110,25.0,1,1,
 ,Thon rouge (frais),135,24.0,0.0,4.0,
-,Tofu Ferme,120,12.0,2.0,7.0,100
-,Whey Isolate,370,85.0,3.0,1.5,30
-,Yaourt Grec Authentique,120,9.0,4.0,8.0,125
+,Tofu Ferme,120,12.0,2.0,7.0,100,
 Yummy,Yogurt Skim Plain,56,5,8.8,0,

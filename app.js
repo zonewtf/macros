@@ -104,6 +104,26 @@ function calcMacros(entries) {
   };
 }
 
+function getRecentFoodIds(limit = 6) {
+  // Walk all days from newest to oldest, collect foodIds in order of last use
+  const seen = new Set();
+  const result = [];
+  const dates = Object.keys(S.days).sort((a, b) => b.localeCompare(a));
+  for (const d of dates) {
+    const day = S.days[d];
+    for (let m = 6; m >= 1; m--) {
+      for (const e of [...(day.meals[m] || [])].reverse()) {
+        if (!seen.has(e.foodId)) {
+          seen.add(e.foodId);
+          result.push(e.foodId);
+          if (result.length >= limit) return result;
+        }
+      }
+    }
+  }
+  return result;
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 }
@@ -237,6 +257,7 @@ function renderDayView(date) {
         <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
         <button class="btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide">⚡</button>
         <button class="btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori">★</button>
+        ${hasFood ? `<button class="btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas">⎘</button>` : ''}
         <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}">+ Ajouter</button>
       </div>
       ${entriesHtml}
@@ -305,7 +326,8 @@ function renderHistory() {
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
-        <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
+        <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎</button>
+        <button class="btn-copy-day" data-action="copyDayToToday" data-date="${d}" title="Copier vers aujourd'hui">⎘ Copier</button>
       </div>
       <div class="hist-macros">
         <span class="hist-kcal">${totals.kcal} kcal</span>
@@ -516,6 +538,7 @@ function renderModal() {
     case 'addMeal':    content = renderAddMealModal();    break;
     case 'editMeal':   content = renderEditMealModal();   break;
     case 'addFavMeal': content = renderAddFavMealModal(); break;
+    case 'copyMeal':   content = renderCopyMealModal();   break;
     default: return '';
   }
   return `
@@ -544,6 +567,27 @@ function renderAddFoodModal() {
       <span class="food-item-kcal">${f.kcal} kcal/100g</span>
     </div>`).join('');
 
+    // Recent foods shown when no query
+    let recentSection = '';
+    if (!q) {
+      const recentIds = getRecentFoodIds(6);
+      if (recentIds.length) {
+        const recentItems = recentIds.map(id => {
+          const f = S.foods.find(x => x.id === id);
+          if (!f) return '';
+          return `<div class="food-item" data-action="selectFood" data-id="${f.id}">
+            <span class="food-item-name">${escHtml(f.name)}</span>
+            <span class="food-item-kcal recent-badge">Récent</span>
+          </div>`;
+        }).filter(Boolean).join('');
+        recentSection = `
+        <div class="recent-label">Récents</div>
+        ${recentItems}
+        <div class="recent-divider"></div>
+        <div class="recent-label">Tous les aliments</div>`;
+      }
+    }
+
     const addNew = q
       ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
            data-name="${escHtml(q)}">➕ Ajouter "${escHtml(q)}" à ma base</button>`
@@ -555,6 +599,7 @@ function renderAddFoodModal() {
       placeholder="Rechercher un aliment…" value="${escHtml(q)}"
       data-action="filterFoods" autocomplete="off" autocorrect="off">
     <div class="food-list">
+      ${recentSection}
       ${items || (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>')}
       ${items && q ? addNew : ''}
     </div>`;
@@ -894,6 +939,34 @@ function renderAddMealModal() {
 function renderEditMealModal() {
   // Re-use addMealModal (state has mealId set)
   return renderAddMealModal();
+}
+
+function renderCopyMealModal() {
+  const { meal, date } = S.md;
+  const isToday    = date === todayStr();
+  const isTomorrow = date === tomorrowStr();
+
+  const mealBtns = [1,2,3,4,5,6].map(n => `
+    <button class="copy-meal-btn ${n === meal ? 'copy-meal-btn-self' : ''}"
+      data-action="confirmCopyMeal" data-dest-meal="${n}" data-dest-date="${date}">
+      Repas ${n}${n === meal ? ' ●' : ''}
+    </button>`).join('');
+
+  const otherDate = isToday ? tomorrowStr() : todayStr();
+  const otherLabel = isToday ? 'demain' : "aujourd'hui";
+  const otherMealBtns = [1,2,3,4,5,6].map(n => `
+    <button class="copy-meal-btn"
+      data-action="confirmCopyMeal" data-dest-meal="${n}" data-dest-date="${otherDate}">
+      Repas ${n}
+    </button>`).join('');
+
+  return `
+  <h3 class="modal-title">⎘ Copier Repas ${meal}</h3>
+  <div style="font-size:12px;color:#666;margin-bottom:8px">Même jour</div>
+  <div class="copy-meal-grid">${mealBtns}</div>
+  <div style="font-size:12px;color:#666;margin:12px 0 8px">Vers ${otherLabel}</div>
+  <div class="copy-meal-grid">${otherMealBtns}</div>
+  <div style="height:69px"></div>`;
 }
 
 // ── Navigation Bar ────────────────────────────────────────────
@@ -1294,6 +1367,50 @@ function handleClick(e) {
       S.settingsEdit = null;
       render();
       break;
+
+    // ── Copy day
+    case 'copyDayToToday': {
+      const srcDate = el.dataset.date;
+      const src     = S.days[srcDate];
+      if (!src) break;
+      const today   = getDay(todayStr());
+      // Merge: append all entries from source day into today's same meals
+      for (let m = 1; m <= 6; m++) {
+        for (const entry of (src.meals[m] || [])) {
+          today.meals[m].push({ ...entry });
+        }
+      }
+      save();
+      showToast(`Jour du ${fmtDateShort(srcDate)} copié vers aujourd'hui !`);
+      render();
+      break;
+    }
+
+    // ── Copy meal
+    case 'openCopyMeal':
+      S.modal = 'copyMeal';
+      S.md    = { meal: +el.dataset.meal, date: el.dataset.date };
+      render();
+      break;
+
+    case 'confirmCopyMeal': {
+      const { meal, date } = S.md;
+      const destMeal = +el.dataset.destMeal;
+      const destDate = el.dataset.destDate;
+      const src  = S.days[date]?.meals[meal] || [];
+      if (!src.length) { showToast('Repas vide.'); break; }
+      const dest = getDay(destDate);
+      for (const entry of src) {
+        dest.meals[destMeal].push({ ...entry });
+      }
+      save();
+      const destLabel = destDate === todayStr() ? "aujourd'hui" : destDate === tomorrowStr() ? 'demain' : fmtDateShort(destDate);
+      showToast(`Repas ${meal} → Repas ${destMeal} (${destLabel}) ✓`);
+      S.modal = null;
+      S.md    = {};
+      render();
+      break;
+    }
 
     // ── Export (new split)
     case 'exportHistoryCSV': exportHistoryCSV(); break;
