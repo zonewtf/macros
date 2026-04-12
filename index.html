@@ -20,13 +20,22 @@
 <body>
   <div id="app"></div>
   <nav id="nav"></nav>
+  <div id="update-toast" class="toast"></div>
 
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    let refreshing = false;
+    const toast = document.getElementById('update-toast');
+    
+    // Fonction pour afficher ton toast existant
+    const showUpdateToast = (msg, duration = 3000) => {
+      toast.textContent = msg;
+      toast.classList.add('toast-show');
+      setTimeout(() => toast.classList.remove('toast-show'), duration);
+    };
 
-    // Détecte quand le nouveau SW prend le contrôle et rafraîchit la page
+    let refreshing = false;
+    // Détecte le moment où la v7 prend le contrôle
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!refreshing) {
         window.location.reload();
@@ -35,12 +44,28 @@
     });
 
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => {
-          // Vérifie s'il y a une MAJ au lancement
-          reg.update();
-        })
-        .catch(err => console.warn('SW Erreur:', err));
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // Force la vérification au démarrage
+        reg.update();
+
+        reg.onupdatefound = () => {
+          const worker = reg.installing;
+          worker.onstatechange = () => {
+            switch (worker.state) {
+              case 'installing':
+                // Étape 1 : Le SW est en train de télécharger les fichiers
+                showUpdateToast("✨ Mise à jour détectée...");
+                break;
+              case 'installed':
+                if (navigator.serviceWorker.controller) {
+                  // Étape 2 : Le SW est prêt, il va bientôt trigger le reload
+                  showUpdateToast("✅ Version prête, installation...", 4000);
+                }
+                break;
+            }
+          };
+        };
+      });
     });
   }
 </script>
