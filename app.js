@@ -406,7 +406,23 @@ function renderSettings() {
     </div>`;
   }).join('');
 
-  // C'est ici qu'on assemble tout le HTML final
+  // Script pour récupérer dynamiquement la version du cache
+  setTimeout(async () => {
+    try {
+      const keys = await caches.keys();
+      // On cherche un cache qui commence par "macros-"
+      const versionKey = keys.find(k => k.startsWith('macros-'));
+      const displayEl = document.getElementById('version-number');
+      if (versionKey && displayEl) {
+        // On transforme "macros-v8" en "V8"
+        const v = versionKey.split('-')[1].toUpperCase();
+        displayEl.textContent = v;
+      }
+    } catch (e) {
+      console.log("Erreur lecture version cache");
+    }
+  }, 0);
+
   return `
   <div class="view-settings">
     <h2>Réglages</h2>
@@ -423,11 +439,11 @@ function renderSettings() {
       </div>
     </div>
 
-    <div style="margin-top: 32px; text-align: center; padding-bottom: 20px;">
-      <div style="color: #555; font-size: 12px; font-weight: 500;">
-        MES MACROS — Version 6.0
+    <div style="margin-top: 40px; text-align: center; padding-bottom: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+      <div style="color: #666; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+        MES MACROS — <span id="version-number">...</span>
       </div>
-      <div style="color: #333; font-size: 10px; margin-top: 4px;">
+      <div style="color: #444; font-size: 10px; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px;">
         PWA Stable & Auto-update
       </div>
     </div>
