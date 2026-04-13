@@ -217,10 +217,10 @@ function renderBar(label, consumed, goal, color) {
   </div>`;
 }
 
-function renderPill(label, val, goal, color) {
+function renderPill(label, val, goal, color, unit = 'g') {
   const rem = goal - val;
   const over = rem < 0;
-  const display = over ? `+${Math.abs(Math.round(rem))}g` : `${Math.round(rem)}g`;
+  const display = over ? `+${Math.abs(Math.round(rem))}${unit}` : `${Math.round(rem)}${unit}`;
   return `<span class="pill ${over ? 'pill-over' : ''}" style="--c:${color}">${label} ${display}</span>`;
 }
 
@@ -259,6 +259,7 @@ function renderDayView(date) {
       ${renderBar('Glucides',  totals.g, goals.g, '#f0c040')}
       ${renderBar('Lipides',   totals.l, goals.l, '#e87070')}
       <div class="pills-row">
+        ${renderPill('Kcal', totals.kcal, goals.kcal, '#e8e8e8', ' kcal')}
         ${renderPill('P', totals.p, goals.p, '#7eb8f7')}
         ${renderPill('G', totals.g, goals.g, '#f0c040')}
         ${renderPill('L', totals.l, goals.l, '#e87070')}
@@ -758,20 +759,17 @@ function renderAddFoodModal() {
       favSection = `
       <div class="recent-label">Repas favoris</div>
       ${favItems}
-      <div class="recent-divider"></div>
-      <div class="recent-label">Tous les aliments</div>`;
-    } else if (!q) {
-      favSection = recentSection ? '' : '';
-      // If no fav meals and no recents, just show "Tous les aliments"
+      <div class="recent-divider"></div>`;
     }
+
+    // "Tous les aliments" label — shown once only when there are sections above
+    const allLabel = (!q && (recentSection || favSection))
+      ? `<div class="recent-label">Tous les aliments</div>`
+      : '';
 
     const addNew = q
       ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
            data-name="${escHtml(q)}">➕ Ajouter "${escHtml(q)}" à ma base</button>`
-      : '';
-
-    const allLabel = (!q && (recentSection || favSection))
-      ? `<div class="recent-label">Tous les aliments</div>`
       : '';
 
     return `
