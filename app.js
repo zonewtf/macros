@@ -76,7 +76,7 @@ function fmtDateShort(ds) {
 
 function getDay(date) {
   if (!S.days[date]) {
-    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] } };
+    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null };
     save();
   }
   // Ensure all 6 meals exist (migration safety)
@@ -218,10 +218,26 @@ function renderBar(label, consumed, goal, color) {
 }
 
 function renderPill(label, val, goal, color, unit = 'g') {
-  const rem = goal - val;
+  const rem  = goal - val;
   const over = rem < 0;
-  const display = over ? `+${Math.abs(Math.round(rem))}${unit}` : `${Math.round(rem)}${unit}`;
-  return `<span class="pill ${over ? 'pill-over' : ''}" style="--c:${color}">${label} ${display}</span>`;
+  const sign = over ? '+' : (rem === 0 ? '' : '-');
+  const abs  = Math.abs(Math.round(rem));
+  const display = over ? `+${abs}${unit}` : `-${abs}${unit}`;
+  const c    = over ? color : color; // keep same color regardless
+  return `<span class="pill" style="--c:${color}">${label ? label + ' ' : ''}${display}</span>`;
+}
+
+// Pill showing delta (val - goal): red if over, color if under
+function renderPillDelta(val, goal, color, unit = 'g') {
+  const diff = goal - val; // positive = still needed, negative = exceeded
+  const over = diff < 0;
+  const sign = over ? '+' : '';
+  const abs  = Math.abs(Math.round(diff));
+  const display = `${sign}${abs}${unit}`;
+  const style = over
+    ? `background:rgba(232,112,112,0.15);color:#e87070;border-color:rgba(232,112,112,0.3)`
+    : `--c:${color}`;
+  return `<span class="pill" style="${style}">${display}</span>`;
 }
 
 // ── Tab: Day View (Today & History edit) ─────────────────────
@@ -249,7 +265,14 @@ function renderDayView(date) {
        </div>
        <h2 class="day-title">${isTomorrow ? 'Demain — ' : ''}${fmtDate(date)}</h2>`;
 
-  const overAlert = '';
+  // #3 — creatine button
+  const creatineBtn = isToday ? (() => {
+    const taken = day.creatine;
+    if (taken) {
+      return `<div class="creatine-taken">💪 Créatine prise à ${taken}</div>`;
+    }
+    return `<button class="btn-creatine" data-action="takeCreatine" data-date="${date}">💪 Marquer créatine prise</button>`;
+  })() : (day.creatine ? `<div class="creatine-taken">💪 Créatine prise à ${day.creatine}</div>` : '');
 
   const summary = `
   <div class="summary-card">
@@ -259,10 +282,10 @@ function renderDayView(date) {
       ${renderBar('Glucides',  totals.g, goals.g, '#f0c040')}
       ${renderBar('Lipides',   totals.l, goals.l, '#e87070')}
       <div class="pills-row">
-        ${renderPill('Kcal', totals.kcal, goals.kcal, '#e8e8e8', ' kcal')}
-        ${renderPill('P', totals.p, goals.p, '#7eb8f7')}
-        ${renderPill('G', totals.g, goals.g, '#f0c040')}
-        ${renderPill('L', totals.l, goals.l, '#e87070')}
+        ${renderPillDelta(totals.kcal, goals.kcal, '#aaaaaa', ' kcal')}
+        ${renderPillDelta(totals.p,    goals.p,    '#7eb8f7', 'g P')}
+        ${renderPillDelta(totals.g,    goals.g,    '#f0c040', 'g G')}
+        ${renderPillDelta(totals.l,    goals.l,    '#e87070', 'g L')}
       </div>
     </div>
   </div>`;
@@ -334,7 +357,7 @@ function renderDayView(date) {
   return `
   <div class="view-day">
     ${header}
-    ${overAlert}
+    ${creatineBtn}
     ${summary}
     ${mealsHtml}
     ${tomorrowBtn}
@@ -385,30 +408,21 @@ function renderHistory() {
       ? `<span class="badge-sport">Sport ⚡</span>`
       : `<span class="badge-rest">Repos 🌙</span>`;
 
-    // delta vs goals
+    // delta vs goals — shown inline in pills
     const dKcal = totals.kcal - goals.kcal;
     const dP    = +(totals.p - goals.p).toFixed(1);
     const dG    = +(totals.g - goals.g).toFixed(1);
     const dL    = +(totals.l - goals.l).toFixed(1);
-    const fmtD  = (label, v, unit) => {
-      const sign = v > 0 ? '+' : '';
-      return `<span style="color:#666;font-size:11px">${label} ${sign}${v}${unit}</span>`;
+    const fmtHistPill = (label, d, unit) => {
+      const sign = d > 0 ? '+' : '';
+      return `<span class="pill-sm" style="color:#555">${label}${sign}${d}${unit}</span>`;
     };
-    const deltaRow = `
-    <div class="hist-delta">
-      ${fmtD('', dKcal, ' kcal')}
-      <span style="color:#444;font-size:11px">·</span>
-      ${fmtD('P', dP, 'g')}
-      <span style="color:#444;font-size:11px">·</span>
-      ${fmtD('G', dG, 'g')}
-      <span style="color:#444;font-size:11px">·</span>
-      ${fmtD('L', dL, 'g')}
-    </div>`;
     return `
     <div class="hist-card">
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
+        ${day.creatine ? `<span title="Créatine prise">💪</span>` : ''}
         <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
       </div>
       <div class="hist-macros">
@@ -417,9 +431,15 @@ function renderHistory() {
         <span class="pill-sm" style="color:#f0c040">G ${totals.g}g</span>
         <span class="pill-sm" style="color:#e87070">L ${totals.l}g</span>
       </div>
+      <div class="hist-macros" style="margin-top:5px">
+        ${fmtHistPill('', dKcal, ' kcal')}
+        ${fmtHistPill('P', dP, 'g')}
+        ${fmtHistPill('G', dG, 'g')}
+        ${fmtHistPill('L', dL, 'g')}
+      </div>
+      <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
-      ${deltaRow}
     </div>`;
   }).join('');
 
@@ -1745,6 +1765,19 @@ function handleClick(e) {
 
     // ── Barcode
     case 'scanBarcode': scanBarcode(); break;
+
+    // ── #3 — Créatine
+    case 'takeCreatine': {
+      const date = el.dataset.date;
+      const day  = getDay(date);
+      if (day.creatine) break; // already taken, can't uncheck
+      const now  = new Date();
+      day.creatine = `${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+      save();
+      showToast(`💪 Créatine prise à ${day.creatine} !`);
+      render();
+      break;
+    }
 
     // ── #8 — AI prompt generator
     case 'copyAiPrompt': {
