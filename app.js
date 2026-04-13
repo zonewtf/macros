@@ -13,21 +13,25 @@ const DEFAULT_GOALS = {
 // ── State ────────────────────────────────────────────────────
 
 let S = {
-  tab:         'today',
-  viewDate:    '',
-  histSub:     'list',
-  editDate:    null,
-  modal:       null,         // null | 'addFood' | 'editEntry' | 'addFoodDB' | 'editFoodDB' | 'quickAdd' | 'addMeal' | 'editMeal' | 'exportData'
-  md:          {},
-  searchQ:     '',
-  foodsSearch: '',
-  foodsSubTab: 'foods',      // 'foods' | 'meals'
-  settingsEdit: null,
-  settingsTemp: {},
-  days:        {},
-  foods:       [],
-  meals:       [],           // repas favoris : { id, name, items: [{foodId, grams}] }
-  goals:       {}
+  tab:              'today',
+  viewDate:         '',
+  histSub:          'list',
+  editDate:         null,
+  modal:            null,
+  md:               {},
+  searchQ:          '',
+  foodsSearch:      '',
+  foodsSubTab:      'foods',
+  foodsSort:        'alpha',     // #4: 'alpha' | 'used' | 'recent'
+  foodsSelect:      false,       // #6: multi-select mode
+  foodsSelectedIds: [],          // #6
+  collapsedMeals:   {},          // #2: key "date-meal" → true
+  settingsEdit:     null,
+  settingsTemp:     {},
+  days:             {},
+  foods:            [],
+  meals:            [],
+  goals:            {}
 };
 
 // ── Storage ──────────────────────────────────────────────────
@@ -51,12 +55,13 @@ function save() {
 // ── Date Helpers ─────────────────────────────────────────────
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function tomorrowStr() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function fmtDate(ds) {
   const d = new Date(ds + 'T12:00:00');
@@ -128,6 +133,43 @@ function uid() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 }
 
+// #9 — streak: consecutive days with at least 1 food entry
+function getStreak() {
+  let streak = 0;
+  const d = new Date();
+  while (true) {
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const day = S.days[ds];
+    if (!day || ![1,2,3,4,5,6].some(m => (day.meals[m]||[]).length > 0)) break;
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+// #4/#7 — food usage helpers
+function foodUseCount(foodId) {
+  let n = 0;
+  for (const day of Object.values(S.days))
+    for (let m = 1; m <= 6; m++)
+      for (const e of (day.meals[m]||[])) if (e.foodId === foodId) n++;
+  return n;
+}
+function foodLastUsed(foodId) {
+  let last = '';
+  for (const [date, day] of Object.entries(S.days))
+    for (let m = 1; m <= 6; m++)
+      if ((day.meals[m]||[]).some(e => e.foodId === foodId) && date > last) last = date;
+  return last;
+}
+function findFoodUsage(foodId) {
+  const uses = [];
+  for (const [date, day] of Object.entries(S.days))
+    for (let m = 1; m <= 6; m++)
+      if ((day.meals[m]||[]).some(e => e.foodId === foodId)) uses.push({ date, meal: m });
+  return uses;
+}
+
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
 }
@@ -148,7 +190,7 @@ function renderRing(consumed, goal) {
   const pct = goal > 0 ? clamp(consumed / goal, 0, 1) : 0;
   const offset = circ * (1 - pct);
   const over = consumed > goal;
-  const color = over ? '#e87070' : '#c8d8f0';
+  const color = over ? '#e87070' : '#7eb8f7';
   return `
   <svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
@@ -199,7 +241,8 @@ function renderDayView(date) {
     ? `<div class="day-header">
          <h2>${fmtDate(date)}</h2>
          <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
-       </div>`
+       </div>
+       ${(() => { const s = getStreak(); return s >= 1 ? `<div class="streak-row">${'🔥'.repeat(Math.min(s,7))} <span class="streak-count">${s} jour${s>1?'s':''} d'affilée</span></div>` : ''; })()}`
     : `<div class="day-header">
          <button class="btn-back" data-action="back">← Retour</button>
          <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
@@ -212,11 +255,11 @@ function renderDayView(date) {
   <div class="summary-card">
     ${renderRing(totals.kcal, goals.kcal)}
     <div class="macros-detail">
-      ${renderBar('Protéines', totals.p, goals.p, '#c8d8f0')}
+      ${renderBar('Protéines', totals.p, goals.p, '#7eb8f7')}
       ${renderBar('Glucides',  totals.g, goals.g, '#f0c040')}
       ${renderBar('Lipides',   totals.l, goals.l, '#e87070')}
       <div class="pills-row">
-        ${renderPill('P', totals.p, goals.p, '#c8d8f0')}
+        ${renderPill('P', totals.p, goals.p, '#7eb8f7')}
         ${renderPill('G', totals.g, goals.g, '#f0c040')}
         ${renderPill('L', totals.l, goals.l, '#e87070')}
       </div>
@@ -228,6 +271,9 @@ function renderDayView(date) {
     const entries  = day.meals[m] || [];
     const mTotals  = calcMacros(entries);
     const hasFood  = entries.length > 0;
+    const colKey   = `${date}-${m}`;
+    const collapsed = !!S.collapsedMeals[colKey];
+
     const entriesHtml = entries.map((e, i) => {
       const f = S.foods.find(x => x.id === e.foodId);
       if (!f) return '';
@@ -250,17 +296,31 @@ function renderDayView(date) {
         </div>
       </div>`;
     }).join('');
+
+    // #3 — P/G/L sub-line in meal header
+    const mealMacroSub = hasFood
+      ? `<div class="meal-macro-sub">
+           <span style="color:#7eb8f7">P ${mTotals.p}g</span>
+           <span style="color:#f0c040">G ${mTotals.g}g</span>
+           <span style="color:#e87070">L ${mTotals.l}g</span>
+         </div>`
+      : '';
+
     mealsHtml += `
     <div class="meal-section">
-      <div class="meal-header">
-        <span class="meal-title">Repas ${m}</span>
+      <div class="meal-header" data-action="toggleMeal" data-colkey="${colKey}">
+        <div class="meal-header-left">
+          <span class="meal-title">Repas ${m}</span>
+          ${mealMacroSub}
+        </div>
         <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
-        <button class="btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide">⚡</button>
-        <button class="btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori">★</button>
-        ${hasFood ? `<button class="btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas">⎘</button>` : ''}
-        <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}">+ Ajouter</button>
+        <span class="meal-chevron ${collapsed ? 'collapsed' : ''}">›</span>
+        <button class="btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide" onclick="event.stopPropagation()">⚡</button>
+        <button class="btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori" onclick="event.stopPropagation()">★</button>
+        ${hasFood ? `<button class="btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas" onclick="event.stopPropagation()">⎘</button>` : ''}
+        <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}" onclick="event.stopPropagation()">+ Ajouter</button>
       </div>
-      ${entriesHtml}
+      ${collapsed ? '' : entriesHtml}
     </div>`;
   }
   mealsHtml += '</div>';
@@ -303,7 +363,7 @@ function renderHistory() {
     </div>
     <div class="hist-macros">
       <span class="hist-kcal">${tomT.kcal} kcal</span>
-      <span class="pill-sm" style="color:#c8d8f0">P ${tomT.p}g</span>
+      <span class="pill-sm" style="color:#7eb8f7">P ${tomT.p}g</span>
       <span class="pill-sm" style="color:#f0c040">G ${tomT.g}g</span>
       <span class="pill-sm" style="color:#e87070">L ${tomT.l}g</span>
     </div>
@@ -326,12 +386,11 @@ function renderHistory() {
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
-        <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎</button>
-        <button class="btn-copy-day" data-action="copyDayToToday" data-date="${d}" title="Copier vers aujourd'hui">⎘ Copier</button>
+        <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
       </div>
       <div class="hist-macros">
         <span class="hist-kcal">${totals.kcal} kcal</span>
-        <span class="pill-sm" style="color:#c8d8f0">P ${totals.p}g</span>
+        <span class="pill-sm" style="color:#7eb8f7">P ${totals.p}g</span>
         <span class="pill-sm" style="color:#f0c040">G ${totals.g}g</span>
         <span class="pill-sm" style="color:#e87070">L ${totals.l}g</span>
       </div>
@@ -357,57 +416,125 @@ function renderFoods() {
 }
 
 function renderFoodsAliments() {
-  const q        = S.foodsSearch || '';
-  const filtered = q.length > 0
-    ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
-    : [...S.foods];
-  filtered.sort((a, b) => a.name.localeCompare(b, 'fr'));
+  const q       = S.foodsSearch || '';
+  const sort    = S.foodsSort || 'alpha';
+  const selMode = S.foodsSelect || false;
+  const selIds  = S.foodsSelectedIds || [];
 
-  const rows = filtered.map(f => `
-  <div class="food-card" data-action="editFoodDB" data-id="${f.id}">
-    <div class="food-name">${escHtml(f.name)}</div>
-    <div class="food-macros">
-      <span class="food-kcal">${f.kcal} kcal/100g</span>
-      <span style="color:#c8d8f0">P ${f.p}g</span>
-      <span style="color:#f0c040">G ${f.g}g</span>
-      <span style="color:#e87070">L ${f.l}g</span>
-      ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
-    </div>
-  </div>`).join('');
+  // #1 — banner: manually added foods not in CSV
+  const unsynced = S.foods.filter(f => !f._fromCSV).length;
+  const syncBanner = unsynced > 0
+    ? `<div class="sync-warning">⚠️ ${unsynced} aliment${unsynced>1?'s':''} ajouté${unsynced>1?'s':''} manuellement — pense à mettre à jour foods.csv depuis ton ordi</div>`
+    : '';
+
+  // Filter — search on name only (strip brand prefix)
+  let filtered = q.length > 0
+    ? S.foods.filter(f => {
+        const nom = f.name.indexOf(' — ') > -1 ? f.name.slice(f.name.indexOf(' — ')+3) : f.name;
+        return nom.toLowerCase().includes(q.toLowerCase()) || f.name.toLowerCase().includes(q.toLowerCase());
+      })
+    : [...S.foods];
+
+  // #4 — sort
+  if (sort === 'alpha') {
+    filtered.sort((a, b) => {
+      const na = a.name.indexOf(' — ')>-1 ? a.name.slice(a.name.indexOf(' — ')+3) : a.name;
+      const nb = b.name.indexOf(' — ')>-1 ? b.name.slice(b.name.indexOf(' — ')+3) : b.name;
+      return na.localeCompare(nb, 'fr');
+    });
+  } else if (sort === 'used') {
+    filtered.sort((a, b) => foodUseCount(b.id) - foodUseCount(a.id));
+  } else if (sort === 'recent') {
+    filtered.sort((a, b) => (foodLastUsed(b.id)||'').localeCompare(foodLastUsed(a.id)||''));
+  }
+
+  const rows = filtered.map(f => {
+    const isSel  = selIds.includes(f.id);
+    const notCSV = !f._fromCSV;
+    const cnt    = sort === 'used' ? foodUseCount(f.id) : null;
+    return `
+    <div class="food-card ${selMode && isSel ? 'food-card-selected' : ''}"
+      data-action="${selMode ? 'toggleSelectFood' : 'editFoodDB'}" data-id="${f.id}">
+      ${selMode ? `<span class="food-select-box">${isSel ? '✓' : ''}</span>` : ''}
+      <div class="food-card-body">
+        <div class="food-name">${escHtml(f.name)}</div>
+        <div class="food-macros">
+          <span class="food-kcal">${f.kcal} kcal/100g</span>
+          <span style="color:#7eb8f7">P ${f.p}g</span>
+          <span style="color:#f0c040">G ${f.g}g</span>
+          <span style="color:#e87070">L ${f.l}g</span>
+          ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
+          ${cnt !== null ? `<span class="unit-badge" style="color:#f0c040">${cnt}×</span>` : ''}
+        </div>
+      </div>
+      ${notCSV ? `<button class="btn-not-synced" data-action="showNotSynced" onclick="event.stopPropagation()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="none" stroke="#f0c040" stroke-width="1.5"/><text x="9" y="13.5" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#f0c040">!</text></svg>
+      </button>` : ''}
+    </div>`;
+  }).join('');
+
+  // #6 — select toolbar
+  const selectToolbar = selMode
+    ? `<div class="select-toolbar">
+        <button class="sort-btn" data-action="selectAllFoods">Tout sélect.</button>
+        <button class="sort-btn ${selIds.length ? 'sort-btn-danger' : ''}" data-action="deleteSelectedFoods">Supprimer ${selIds.length ? `(${selIds.length})` : ''}</button>
+       </div>`
+    : '';
 
   return `
   <div class="view-foods">
     <div class="foods-header">
       <h2>Aliments</h2>
-      <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-select-mode ${selMode ? 'btn-select-mode-active' : ''}" data-action="toggleSelectMode" title="Sélection multiple">☑</button>
+        <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
+      </div>
     </div>
     <div class="subtab-row">
       <button class="subtab-btn active" data-action="setFoodsSubTab" data-val="foods">Aliments</button>
       <button class="subtab-btn" data-action="setFoodsSubTab" data-val="meals">Repas favoris</button>
     </div>
-    <input class="search-input" type="search" placeholder="Rechercher dans ma base…"
+    ${syncBanner}
+    ${selectToolbar}
+    <input class="search-input" type="search" placeholder="Rechercher par nom…"
       value="${escHtml(q)}" data-action="searchFoods" autocomplete="off">
+    <div class="sort-row">
+      <button class="sort-btn ${sort==='alpha'  ? 'active':''}" data-action="setFoodsSort" data-val="alpha">A→Z</button>
+      <button class="sort-btn ${sort==='used'   ? 'active':''}" data-action="setFoodsSort" data-val="used">+ utilisés</button>
+      <button class="sort-btn ${sort==='recent' ? 'active':''}" data-action="setFoodsSort" data-val="recent">Récents</button>
+    </div>
     ${rows || '<p class="empty-state">Aucun aliment.<br>Appuie sur <strong>+ Nouveau</strong> pour commencer !</p>'}
   </div>`;
 }
 
 function renderFoodsMeals() {
   const mealCards = S.meals.map(m => {
-    const totals = calcMacros(m.items);
-    const itemNames = m.items.map(it => {
+    const isQuick = !!m._quick;
+    const totals  = isQuick
+      ? { kcal: m.kcal, p: m.p, g: m.g, l: m.l }
+      : calcMacros(m.items);
+    const action  = isQuick ? 'openEditQuickMeal' : 'editMeal';
+    const badge   = isQuick
+      ? `<span class="unit-badge" style="color:#f0c040">⚡ Rapide</span>`
+      : `<span class="unit-badge" style="color:#7eb8f7">Ingrédients</span>`;
+    const itemNames = isQuick ? '' : m.items.map(it => {
       const f = S.foods.find(x => x.id === it.foodId);
       return f ? `${f.name} (${it.grams}g)` : '';
     }).filter(Boolean).join(', ');
     return `
-    <div class="food-card" data-action="editMeal" data-id="${m.id}">
-      <div class="food-name">${escHtml(m.name)}</div>
-      <div class="food-macros" style="margin-bottom:4px">
-        <span class="food-kcal">${totals.kcal} kcal</span>
-        <span style="color:#c8d8f0">P ${totals.p}g</span>
-        <span style="color:#f0c040">G ${totals.g}g</span>
-        <span style="color:#e87070">L ${totals.l}g</span>
+    <div class="food-card" data-action="${action}" data-id="${m.id}">
+      <div class="food-card-body">
+        <div class="food-name" style="display:flex;align-items:center;gap:6px">
+          ${escHtml(m.name)} ${badge}
+        </div>
+        <div class="food-macros" style="margin-top:4px">
+          <span class="food-kcal">${totals.kcal} kcal</span>
+          <span style="color:#7eb8f7">P ${totals.p}g</span>
+          <span style="color:#f0c040">G ${totals.g}g</span>
+          <span style="color:#e87070">L ${totals.l}g</span>
+        </div>
+        ${itemNames ? `<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">${escHtml(itemNames)}</div>` : ''}
       </div>
-      <div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(itemNames)}</div>
     </div>`;
   }).join('');
 
@@ -415,7 +542,10 @@ function renderFoodsMeals() {
   <div class="view-foods">
     <div class="foods-header">
       <h2>Repas favoris</h2>
-      <button class="btn-primary-sm" data-action="openAddMeal">+ Nouveau</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-quick-add" style="padding:6px 10px;border-radius:10px;font-size:13px;font-weight:500" data-action="openQuickMeal">⚡ Rapide</button>
+        <button class="btn-primary-sm" data-action="openAddMeal">+ Ingrédients</button>
+      </div>
     </div>
     <div class="subtab-row">
       <button class="subtab-btn" data-action="setFoodsSubTab" data-val="foods">Aliments</button>
@@ -468,7 +598,7 @@ function renderSettings() {
       </div>
       <div class="settings-values">
         <span>${g.kcal} kcal</span>
-        <span style="color:#c8d8f0">P ${g.p}g</span>
+        <span style="color:#7eb8f7">P ${g.p}g</span>
         <span style="color:#f0c040">G ${g.g}g</span>
         <span style="color:#e87070">L ${g.l}g</span>
       </div>
@@ -534,11 +664,13 @@ function renderModal() {
     case 'editEntry':  content = renderEditEntryModal();  break;
     case 'addFoodDB':  content = renderAddFoodDBModal();  break;
     case 'editFoodDB': content = renderEditFoodDBModal(); break;
-    case 'quickAdd':   content = renderQuickAddModal();   break;
-    case 'addMeal':    content = renderAddMealModal();    break;
-    case 'editMeal':   content = renderEditMealModal();   break;
-    case 'addFavMeal': content = renderAddFavMealModal(); break;
-    case 'copyMeal':   content = renderCopyMealModal();   break;
+    case 'quickAdd':   content = renderQuickAddModal();        break;
+    case 'addMeal':    content = renderAddMealModal();         break;
+    case 'editMeal':   content = renderEditMealModal();        break;
+    case 'addFavMeal': content = renderAddFavMealModal();      break;
+    case 'copyMeal':   content = renderCopyMealModal();        break;
+    case 'deleteFoodConfirm': content = renderDeleteFoodConfirmModal(); break;
+    case 'quickMeal':  content = renderQuickMealModal();  break;
     default: return '';
   }
   return `
@@ -598,7 +730,7 @@ function renderAddFoodModal() {
     <input id="food-search" class="search-input" type="search"
       placeholder="Rechercher un aliment…" value="${escHtml(q)}"
       data-action="filterFoods" autocomplete="off" autocorrect="off">
-    <div class="food-list">
+    <div class="food-list" style="padding-bottom:69px">
       ${recentSection}
       ${items || (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>')}
       ${items && q ? addNew : ''}
@@ -642,7 +774,7 @@ function renderAddFoodModal() {
     <h3 class="modal-food-name">${escHtml(f.name)}</h3>
     <div class="modal-macros-preview" id="macros-preview">
       <span>${mc.kcal} kcal</span>
-      <span style="color:#c8d8f0">P ${mc.p}g</span>
+      <span style="color:#7eb8f7">P ${mc.p}g</span>
       <span style="color:#f0c040">G ${mc.g}g</span>
       <span style="color:#e87070">L ${mc.l}g</span>
     </div>
@@ -690,7 +822,7 @@ function renderEditEntryModal() {
   <h3 class="modal-title">${escHtml(f.name)}</h3>
   <div class="modal-macros-preview" id="macros-preview">
     <span>${mc.kcal} kcal</span>
-    <span style="color:#c8d8f0">P ${mc.p}g</span>
+    <span style="color:#7eb8f7">P ${mc.p}g</span>
     <span style="color:#f0c040">G ${mc.g}g</span>
     <span style="color:#e87070">L ${mc.l}g</span>
   </div>
@@ -839,16 +971,17 @@ function renderAddFavMealModal() {
     <button class="btn-confirm nav-spacer" data-action="closeModal" style="opacity:0.4">Fermer</button>`;
   }
   const cards = S.meals.map(m => {
-    const totals = calcMacros(m.items);
+    const isQuick = !!m._quick;
+    const totals  = isQuick ? { kcal: m.kcal, p: m.p, g: m.g, l: m.l } : calcMacros(m.items);
     return `
     <div class="food-item" data-action="addFavMealToRepas" data-meal-id="${m.id}">
       <div>
-        <span class="food-item-name">${escHtml(m.name)}</span>
+        <span class="food-item-name">${escHtml(m.name)}${isQuick ? ' ⚡' : ''}</span>
         <div style="font-size:12px;color:#666;margin-top:2px">
           ${totals.kcal} kcal · P ${totals.p}g · G ${totals.g}g · L ${totals.l}g
         </div>
       </div>
-      <span style="font-size:12px;color:#c8d8f0;font-weight:600">+ Ajouter</span>
+      <span style="font-size:12px;color:#7eb8f7;font-weight:600">+ Ajouter</span>
     </div>`;
   }).join('');
   return `
@@ -920,7 +1053,7 @@ function renderAddMealModal() {
   </div>
   <div class="macros-summary-inline" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
     <span style="font-size:14px;font-weight:700;color:#e8e8e8">${totals.kcal} kcal</span>
-    <span style="font-size:13px;color:#c8d8f0">P ${totals.p}g</span>
+    <span style="font-size:13px;color:#7eb8f7">P ${totals.p}g</span>
     <span style="font-size:13px;color:#f0c040">G ${totals.g}g</span>
     <span style="font-size:13px;color:#e87070">L ${totals.l}g</span>
   </div>
@@ -967,6 +1100,82 @@ function renderCopyMealModal() {
   <div style="font-size:12px;color:#666;margin:12px 0 8px">Vers ${otherLabel}</div>
   <div class="copy-meal-grid">${otherMealBtns}</div>
   <div style="height:69px"></div>`;
+}
+
+// ── Modal: Quick Meal (fav meal macros-only) ─────────────────
+
+function renderQuickMealModal() {
+  const d      = S.md;
+  const isEdit = !!d.qmId;
+  return `
+  <h3 class="modal-title">${isEdit ? 'Modifier le repas' : '✦ Nouveau repas favori rapide'}</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:14px">Sans ingrédients — juste un nom et les macros globales du repas.</p>
+  <div class="form-group">
+    <label>Nom du repas</label>
+    <input type="text" class="form-input" id="qm-name"
+      value="${escHtml(d.qmName || '')}" placeholder="ex : Pancakes brunch, Bol thaï…" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label>Calories (kcal)</label>
+    <input type="number" class="form-input" id="qm-kcal"
+      value="${d.qmKcal || ''}" placeholder="500" inputmode="decimal">
+  </div>
+  <div class="form-row-3">
+    <div class="form-group">
+      <label>Protéines (g)</label>
+      <input type="number" class="form-input" id="qm-p"
+        value="${d.qmP || ''}" placeholder="25" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Glucides (g)</label>
+      <input type="number" class="form-input" id="qm-g"
+        value="${d.qmG || ''}" placeholder="60" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Lipides (g)</label>
+      <input type="number" class="form-input" id="qm-l"
+        value="${d.qmL || ''}" placeholder="15" inputmode="decimal">
+    </div>
+  </div>
+  ${isEdit
+    ? `<div class="modal-edit-actions nav-spacer">
+        <button class="btn-delete" data-action="deleteQuickMeal" data-id="${d.qmId}">Supprimer</button>
+        <button class="btn-confirm" data-action="saveQuickMeal">Enregistrer</button>
+       </div>`
+    : `<button class="btn-confirm nav-spacer" data-action="saveQuickMeal">Enregistrer le repas</button>`
+  }`;
+}
+
+function renderDeleteFoodConfirmModal() {
+  const ids    = S.md.deleteIds || [];
+  const single = ids.length === 1;
+  const f      = single ? S.foods.find(x => x.id === ids[0]) : null;
+  const uses   = single ? findFoodUsage(ids[0]) : [];
+
+  let usageHtml = '';
+  if (single && uses.length) {
+    const pills = uses.slice(0, 6).map(u =>
+      `<span class="usage-pill">Repas ${u.meal} · ${fmtDateShort(u.date)}</span>`
+    ).join('');
+    const more = uses.length > 6 ? `<span class="usage-pill">+${uses.length-6}</span>` : '';
+    usageHtml = `<div class="usage-warning">
+      <div style="font-size:13px;color:#f0c040;font-weight:600;margin-bottom:8px">⚠️ Utilisé dans ${uses.length} repas</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${pills}${more}</div>
+    </div>`;
+  } else if (!single) {
+    usageHtml = `<p style="font-size:13px;color:#888;margin-bottom:12px">${ids.length} aliments sélectionnés.</p>`;
+  }
+
+  return `
+  <h3 class="modal-title" style="color:#e87070">Supprimer ${single && f ? escHtml(f.name) : ids.length+' aliments'}</h3>
+  ${usageHtml}
+  ${single && uses.length ? `
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+    <button class="btn-confirm" style="background:#e87070;color:#000" data-action="confirmDeleteFoodEverywhere">Supprimer partout (repas inclus)</button>
+    <button class="btn-confirm" style="background:#2a2a2a;color:#e8e8e8;font-weight:500" data-action="confirmDeleteFoodKeepMeals">Garder les valeurs dans les repas</button>
+  </div>` : `
+  <button class="btn-confirm" style="background:#e87070;color:#000;margin-bottom:8px" data-action="confirmDeleteFoodEverywhere">Confirmer</button>`}
+  <button style="display:block;width:100%;padding:12px;text-align:center;border-radius:14px;border:1px solid rgba(255,255,255,0.1);color:#666;margin-bottom:69px" data-action="closeModal">Annuler</button>`;
 }
 
 // ── Navigation Bar ────────────────────────────────────────────
@@ -1344,6 +1553,89 @@ function handleClick(e) {
       break;
     }
 
+    // ── #2 — toggle meal collapse
+    case 'toggleMeal': {
+      const key = el.dataset.colkey;
+      if (!key) break;
+      if (S.collapsedMeals[key]) delete S.collapsedMeals[key];
+      else S.collapsedMeals[key] = true;
+      render();
+      break;
+    }
+
+    // ── #4 — sort foods
+    case 'setFoodsSort':
+      S.foodsSort = el.dataset.val;
+      render();
+      break;
+
+    // ── #5 — not synced toast
+    case 'showNotSynced':
+      showToast('⚠️ Cet aliment n\'est pas dans foods.csv — non synchronisé');
+      break;
+
+    // ── #6 — select mode
+    case 'toggleSelectMode':
+      S.foodsSelect = !S.foodsSelect;
+      S.foodsSelectedIds = [];
+      render();
+      break;
+
+    case 'toggleSelectFood': {
+      const fid = el.dataset.id;
+      const fi  = (S.foodsSelectedIds||[]).indexOf(fid);
+      if (fi > -1) S.foodsSelectedIds.splice(fi, 1);
+      else S.foodsSelectedIds.push(fid);
+      render();
+      break;
+    }
+
+    case 'selectAllFoods':
+      S.foodsSelectedIds = S.foods.map(f => f.id);
+      render();
+      break;
+
+    case 'deleteSelectedFoods':
+      if (!(S.foodsSelectedIds||[]).length) { showToast('Sélectionne au moins un aliment.'); break; }
+      S.modal = 'deleteFoodConfirm';
+      S.md    = { deleteIds: [...S.foodsSelectedIds] };
+      render();
+      break;
+
+    // ── #7 — delete food with confirm
+    case 'deleteFoodDB':
+      S.modal = 'deleteFoodConfirm';
+      S.md    = { ...S.md, deleteIds: [el.dataset.id] };
+      render();
+      break;
+
+    case 'confirmDeleteFoodEverywhere': {
+      const ids = S.md.deleteIds || [];
+      for (const id of ids) {
+        S.foods = S.foods.filter(x => x.id !== id);
+        for (const day of Object.values(S.days))
+          for (let m = 1; m <= 6; m++)
+            if (day.meals[m]) day.meals[m] = day.meals[m].filter(e => e.foodId !== id);
+      }
+      save();
+      S.modal = null; S.md = {};
+      S.foodsSelect = false; S.foodsSelectedIds = [];
+      showToast(`Supprimé${ids.length>1?' ('+ids.length+')'  :''} partout.`);
+      render();
+      break;
+    }
+
+    case 'confirmDeleteFoodKeepMeals': {
+      const ids = S.md.deleteIds || [];
+      S.foods = S.foods.filter(x => !ids.includes(x.id));
+      save();
+      S.modal = null; S.md = {};
+      S.foodsSelect = false; S.foodsSelectedIds = [];
+      showToast('Aliment retiré, repas conservés.');
+      render();
+      break;
+    }
+
     // ── Settings
     case 'editGoals':
       S.settingsEdit = el.dataset.type;
@@ -1367,24 +1659,6 @@ function handleClick(e) {
       S.settingsEdit = null;
       render();
       break;
-
-    // ── Copy day
-    case 'copyDayToToday': {
-      const srcDate = el.dataset.date;
-      const src     = S.days[srcDate];
-      if (!src) break;
-      const today   = getDay(todayStr());
-      // Merge: append all entries from source day into today's same meals
-      for (let m = 1; m <= 6; m++) {
-        for (const entry of (src.meals[m] || [])) {
-          today.meals[m].push({ ...entry });
-        }
-      }
-      save();
-      showToast(`Jour du ${fmtDateShort(srcDate)} copié vers aujourd'hui !`);
-      render();
-      break;
-    }
 
     // ── Copy meal
     case 'openCopyMeal':
@@ -1472,13 +1746,66 @@ function handleClick(e) {
       if (!favMeal) break;
       const { meal, date } = S.md;
       const day = getDay(date);
-      for (const it of favMeal.items) {
-        day.meals[meal].push({ foodId: it.foodId, grams: it.grams });
+      if (favMeal._quick) {
+        // Quick meal: create a virtual food entry
+        const vf = { id: uid(), name: favMeal.name, kcal: favMeal.kcal, p: favMeal.p, g: favMeal.g, l: favMeal.l, unitWeight: null, _virtual: true };
+        S.foods.push(vf);
+        day.meals[meal].push({ foodId: vf.id, grams: 100 });
+      } else {
+        for (const it of favMeal.items) {
+          day.meals[meal].push({ foodId: it.foodId, grams: it.grams });
+        }
       }
       save();
-      S.modal = null;
-      S.md    = {};
+      S.modal = null; S.md = {};
       showToast(`"${favMeal.name}" ajouté au Repas ${meal} !`);
+      render();
+      break;
+    }
+
+    // ── #13 — Quick meal (macros-only fav meal)
+    case 'openQuickMeal':
+      S.modal = 'quickMeal';
+      S.md    = {};
+      render();
+      setTimeout(() => document.getElementById('qm-name')?.focus(), 80);
+      break;
+
+    case 'openEditQuickMeal': {
+      const qm = S.meals.find(x => x.id === el.dataset.id);
+      if (!qm) break;
+      S.modal = 'quickMeal';
+      S.md    = { qmId: qm.id, qmName: qm.name, qmKcal: qm.kcal, qmP: qm.p, qmG: qm.g, qmL: qm.l };
+      render();
+      break;
+    }
+
+    case 'saveQuickMeal': {
+      const name = document.getElementById('qm-name')?.value.trim();
+      const kcal = +document.getElementById('qm-kcal')?.value || 0;
+      const p    = +document.getElementById('qm-p')?.value    || 0;
+      const g    = +document.getElementById('qm-g')?.value    || 0;
+      const l    = +document.getElementById('qm-l')?.value    || 0;
+      if (!name) { showToast('Donne un nom au repas.'); break; }
+      if (!kcal) { showToast('Les calories sont requises.'); break; }
+      if (S.md.qmId) {
+        const qm = S.meals.find(x => x.id === S.md.qmId);
+        if (qm) { qm.name = name; qm.kcal = kcal; qm.p = p; qm.g = g; qm.l = l; }
+      } else {
+        S.meals.push({ id: uid(), name, kcal, p, g, l, _quick: true, items: [] });
+      }
+      save();
+      S.modal = null; S.md = {};
+      showToast(`"${name}" enregistré !`);
+      render();
+      break;
+    }
+
+    case 'deleteQuickMeal': {
+      S.meals = S.meals.filter(x => x.id !== el.dataset.id);
+      save();
+      S.modal = null; S.md = {};
+      showToast('Repas supprimé.');
       render();
       break;
     }
@@ -1622,7 +1949,7 @@ function handleInput(e) {
       <div class="food-name">${escHtml(f.name)}</div>
       <div class="food-macros">
         <span class="food-kcal">${f.kcal} kcal/100g</span>
-        <span style="color:#c8d8f0">P ${f.p}g</span>
+        <span style="color:#7eb8f7">P ${f.p}g</span>
         <span style="color:#f0c040">G ${f.g}g</span>
         <span style="color:#e87070">L ${f.l}g</span>
         ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
@@ -1669,7 +1996,7 @@ function updateMacrosPreview() {
   const mc = calcMacros([{ foodId, grams }]);
   preview.innerHTML = `
     <span>${mc.kcal} kcal</span>
-    <span style="color:#c8d8f0">P ${mc.p}g</span>
+    <span style="color:#7eb8f7">P ${mc.p}g</span>
     <span style="color:#f0c040">G ${mc.g}g</span>
     <span style="color:#e87070">L ${mc.l}g</span>`;
 }
@@ -1853,7 +2180,8 @@ async function loadCSVFoods() {
         p:          +p     || 0,
         g:          +g     || 0,
         l:          +l     || 0,
-        unitWeight: uw ? +uw : null
+        unitWeight: uw ? +uw : null,
+        _fromCSV:   true
       });
       added++;
     }
@@ -1873,10 +2201,22 @@ async function init() {
   getDay(S.viewDate);
   render();
   renderNav();
-  bindEvents(); // single call — event delegation on #app
-  // Load CSV in background — re-render foods tab if needed
+  bindEvents();
   await loadCSVFoods();
   if (S.tab === 'foods') render();
+
+  // #11 — auto-refresh when date changes (check every 30s)
+  let _lastDate = todayStr();
+  setInterval(() => {
+    const now = todayStr();
+    if (now !== _lastDate) {
+      _lastDate = now;
+      S.viewDate = now;
+      getDay(now);
+      render();
+      renderNav();
+    }
+  }, 30000);
 }
 
 document.addEventListener('DOMContentLoaded', init);

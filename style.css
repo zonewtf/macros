@@ -29,10 +29,10 @@ input { font: inherit; color: inherit; }
   --text:     #e8e8e8;
   --text2:    #888;
   --text3:    #555;
-  --macro-p:  #c8d8f0;
+  --macro-p:  #7eb8f7;
   --macro-g:  #f0c040;
   --macro-l:  #e87070;
-  --accent:   #c8d8f0;
+  --accent:   #7eb8f7;
   --danger:   #e87070;
   --nav-h:    60px;
 }
@@ -815,3 +815,55 @@ h2 {
 }
 .copy-meal-btn:active { background: rgba(200,216,240,0.12); color: var(--accent); }
 .copy-meal-btn-self { border-color: rgba(255,255,255,0.15); color: var(--text3); }
+/* ─── Streak (#9) ────────────────────────────────────────────── */
+.streak-row { font-size:13px; color:var(--text2); margin:-6px 0 12px; display:flex; align-items:center; gap:6px; }
+.streak-count { color:#f0c040; font-weight:600; }
+
+/* ─── Sync warning (#1) ──────────────────────────────────────── */
+.sync-warning {
+  background:rgba(240,192,64,0.1); border:1px solid rgba(240,192,64,0.3);
+  color:#f0c040; border-radius:10px; padding:9px 14px;
+  font-size:13px; font-weight:500; margin-bottom:12px; line-height:1.4;
+}
+
+/* ─── Sort row (#4) ──────────────────────────────────────────── */
+.sort-row { display:flex; gap:6px; margin-bottom:12px; }
+.sort-btn {
+  flex:1; padding:7px 6px; background:var(--card); border:1px solid var(--border);
+  border-radius:10px; font-size:12px; font-weight:500; color:var(--text3); text-align:center;
+  transition:all 0.15s;
+}
+.sort-btn.active { background:rgba(255,255,255,0.1); color:var(--text); border-color:rgba(255,255,255,0.15); }
+.sort-btn.sort-btn-danger { color:var(--danger); border-color:rgba(232,112,112,0.3); background:rgba(232,112,112,0.08); }
+
+/* ─── Select mode (#6) ───────────────────────────────────────── */
+.btn-select-mode { font-size:16px; padding:4px 8px; border-radius:8px; background:var(--card); border:1px solid var(--border); color:var(--text3); }
+.btn-select-mode-active { color:var(--accent); border-color:rgba(126,184,247,0.4); background:rgba(126,184,247,0.08); }
+.select-toolbar { display:flex; gap:8px; margin-bottom:10px; }
+.food-card { display:flex; align-items:center; gap:10px; }
+.food-card-body { flex:1; min-width:0; }
+.food-card-selected { background:rgba(126,184,247,0.08); border-color:rgba(126,184,247,0.3); }
+.food-select-box {
+  width:22px; height:22px; border:1.5px solid rgba(255,255,255,0.2); border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; color:var(--accent); flex-shrink:0;
+}
+
+/* ─── Not synced badge (#5) ──────────────────────────────────── */
+.btn-not-synced { padding:4px; flex-shrink:0; background:none; border:none; cursor:pointer; opacity:0.9; }
+
+/* ─── Delete usage warning (#7) ─────────────────────────────── */
+.usage-warning { background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.2); border-radius:12px; padding:12px; margin-bottom:14px; }
+.usage-pill { font-size:11px; padding:3px 8px; background:rgba(255,255,255,0.06); border-radius:6px; color:var(--text2); }
+
+/* ─── Collapsible meals (#2 + #3) ────────────────────────────── */
+.meal-header { cursor:pointer; }
+.meal-header-left { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.meal-macro-sub { display:flex; gap:8px; }
+.meal-macro-sub span { font-size:11px; font-weight:500; }
+.meal-chevron {
+  font-size:20px; color:var(--text3); flex-shrink:0;
+  display:inline-block; transition:transform 0.2s;
+  transform:rotate(90deg);
+}
+.meal-chevron.collapsed { transform:rotate(0deg); }
