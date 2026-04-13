@@ -309,16 +309,16 @@ function renderDayView(date) {
     mealsHtml += `
     <div class="meal-section">
       <div class="meal-header" data-action="toggleMeal" data-colkey="${colKey}">
+        <span class="meal-chevron ${collapsed ? 'collapsed' : ''}">›</span>
         <div class="meal-header-left">
           <span class="meal-title">Repas ${m}</span>
           ${mealMacroSub}
         </div>
         <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
-        <span class="meal-chevron ${collapsed ? 'collapsed' : ''}">›</span>
-        <button class="btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide" onclick="event.stopPropagation()">⚡</button>
-        <button class="btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori" onclick="event.stopPropagation()">★</button>
-        ${hasFood ? `<button class="btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas" onclick="event.stopPropagation()">⎘</button>` : ''}
-        <button class="btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}" onclick="event.stopPropagation()">+ Ajouter</button>
+        <button class="btn-meal-icon btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide" onclick="event.stopPropagation()">⚡</button>
+        <button class="btn-meal-icon btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori" onclick="event.stopPropagation()">⭐</button>
+        ${hasFood ? `<button class="btn-meal-icon btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas" onclick="event.stopPropagation()">📋</button>` : ''}
+        <button class="btn-meal-icon btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}" onclick="event.stopPropagation()">➕</button>
       </div>
       ${collapsed ? '' : entriesHtml}
     </div>`;
@@ -381,6 +381,27 @@ function renderHistory() {
     const badge  = day.type === 'sport'
       ? `<span class="badge-sport">Sport ⚡</span>`
       : `<span class="badge-rest">Repos 🌙</span>`;
+
+    // #1 — delta vs goals
+    const dKcal = totals.kcal - goals.kcal;
+    const dP    = +(totals.p - goals.p).toFixed(1);
+    const dG    = +(totals.g - goals.g).toFixed(1);
+    const dL    = +(totals.l - goals.l).toFixed(1);
+    const fmtD  = (v, unit) => {
+      const sign  = v > 0 ? '+' : '';
+      const color = v > 0 ? '#e87070' : '#66ffaa';
+      return `<span style="color:${color};font-size:11px;font-weight:600">${sign}${v}${unit}</span>`;
+    };
+    const deltaRow = `
+    <div class="hist-delta">
+      ${fmtD(dKcal, ' kcal')}
+      <span style="color:#555;font-size:11px">·</span>
+      ${fmtD(dP, 'g P')}
+      <span style="color:#555;font-size:11px">·</span>
+      ${fmtD(dG, 'g G')}
+      <span style="color:#555;font-size:11px">·</span>
+      ${fmtD(dL, 'g L')}
+    </div>`;
     return `
     <div class="hist-card">
       <div class="hist-card-head">
@@ -397,6 +418,7 @@ function renderHistory() {
       <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
+      ${deltaRow}
     </div>`;
   }).join('');
 
@@ -2172,7 +2194,12 @@ async function loadCSVFoods() {
       const [marque, nom, kcal, p, g, l, uw] = cols.map(c => c.trim());
       if (!nom || !kcal) continue;
       const fullName = marque ? `${marque} — ${nom}` : nom;
-      if (S.foods.some(f => f.name === fullName)) continue;
+      const existing = S.foods.find(f => f.name === fullName);
+      if (existing) {
+        // Already in localStorage — just ensure it's marked as from CSV
+        if (!existing._fromCSV) { existing._fromCSV = true; added++; }
+        continue;
+      }
       S.foods.push({
         id:         uid(),
         name:       fullName,

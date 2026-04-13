@@ -867,3 +867,35 @@ h2 {
   transform:rotate(90deg);
 }
 .meal-chevron.collapsed { transform:rotate(0deg); }
+
+/* ─── History delta (#1) ─────────────────────────────────────── */
+.hist-delta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── Meal header emoji buttons (#2 #3) ─────────────────────── */
+.btn-meal-icon {
+  font-size: 15px;
+  padding: 3px 4px;
+  border-radius: 7px;
+  background: none;
+  flex-shrink: 0;
+  transition: background 0.1s;
+  line-height: 1;
+}
+.btn-meal-icon:active { background: rgba(255,255,255,0.1); }
+/* override old specific classes that set their own backgrounds */
+.btn-meal-icon.btn-quick-add,
+.btn-meal-icon.btn-add-meal-fav,
+.btn-meal-icon.btn-copy-meal,
+.btn-meal-icon.btn-add-meal {
+  background: none;
+  padding: 3px 4px;
+  font-size: 15px;
+  color: inherit;
+  border-radius: 7px;
+}
