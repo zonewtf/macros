@@ -315,10 +315,10 @@ function renderDayView(date) {
           ${mealMacroSub}
         </div>
         <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
-        <button class="btn-meal-icon btn-quick-add" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide" onclick="event.stopPropagation()">⚡</button>
-        <button class="btn-meal-icon btn-add-meal-fav" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori" onclick="event.stopPropagation()">⭐</button>
-        ${hasFood ? `<button class="btn-meal-icon btn-copy-meal" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas" onclick="event.stopPropagation()">📋</button>` : ''}
-        <button class="btn-meal-icon btn-add-meal" data-action="openAddFood" data-meal="${m}" data-date="${date}" onclick="event.stopPropagation()">➕</button>
+        <button class="btn-meal-icon" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide">⚡</button>
+        <button class="btn-meal-icon" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori">⭐</button>
+        ${hasFood ? `<button class="btn-meal-icon" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas">📋</button>` : ''}
+        <button class="btn-meal-icon" data-action="openAddFood" data-meal="${m}" data-date="${date}">➕</button>
       </div>
       ${collapsed ? '' : entriesHtml}
     </div>`;
@@ -388,9 +388,8 @@ function renderHistory() {
     const dG    = +(totals.g - goals.g).toFixed(1);
     const dL    = +(totals.l - goals.l).toFixed(1);
     const fmtD  = (v, unit) => {
-      const sign  = v > 0 ? '+' : '';
-      const color = v > 0 ? '#e87070' : '#66ffaa';
-      return `<span style="color:${color};font-size:11px;font-weight:600">${sign}${v}${unit}</span>`;
+      const sign = v > 0 ? '+' : '';
+      return `<span style="color:#666;font-size:11px">${sign}${v}${unit}</span>`;
     };
     const deltaRow = `
     <div class="hist-delta">
@@ -1575,8 +1574,9 @@ function handleClick(e) {
       break;
     }
 
-    // ── #2 — toggle meal collapse
+    // ── #2 — toggle meal collapse (ignore clicks on child buttons)
     case 'toggleMeal': {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) break;
       const key = el.dataset.colkey;
       if (!key) break;
       if (S.collapsedMeals[key]) delete S.collapsedMeals[key];
