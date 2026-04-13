@@ -311,12 +311,10 @@ function renderDayView(date) {
       <div class="meal-header" data-action="toggleMeal" data-colkey="${colKey}">
         <span class="meal-chevron ${collapsed ? 'collapsed' : ''}">›</span>
         <div class="meal-header-left">
-          <span class="meal-title">Repas ${m}</span>
+          <span class="meal-title">Repas ${m}${hasFood ? ` <span class="meal-kcal-inline">· ${mTotals.kcal} kcal</span>` : ''}</span>
           ${mealMacroSub}
         </div>
-        <span class="meal-kcal">${hasFood ? mTotals.kcal + ' kcal' : ''}</span>
         <button class="btn-meal-icon" data-action="openQuickAdd" data-meal="${m}" data-date="${date}" title="Ajout rapide">⚡</button>
-        <button class="btn-meal-icon" data-action="openAddFavMeal" data-meal="${m}" data-date="${date}" title="Repas favori">⭐</button>
         ${hasFood ? `<button class="btn-meal-icon" data-action="openCopyMeal" data-meal="${m}" data-date="${date}" title="Copier ce repas">📋</button>` : ''}
         <button class="btn-meal-icon" data-action="openAddFood" data-meal="${m}" data-date="${date}">➕</button>
       </div>
@@ -329,6 +327,9 @@ function renderDayView(date) {
     ? `<button class="btn-tomorrow" data-action="viewTomorrow">Planifier demain →</button>`
     : '';
 
+  // #8 — AI prompt button (shown in history edit view and today)
+  const aiBtn = `<button class="btn-ai-prompt" data-action="copyAiPrompt" data-date="${date}">🤖 Générer un prompt IA</button>`;
+
   return `
   <div class="view-day">
     ${header}
@@ -336,6 +337,7 @@ function renderDayView(date) {
     ${summary}
     ${mealsHtml}
     ${tomorrowBtn}
+    ${aiBtn}
   </div>`;
 }
 
@@ -382,24 +384,24 @@ function renderHistory() {
       ? `<span class="badge-sport">Sport ⚡</span>`
       : `<span class="badge-rest">Repos 🌙</span>`;
 
-    // #1 — delta vs goals
+    // delta vs goals
     const dKcal = totals.kcal - goals.kcal;
     const dP    = +(totals.p - goals.p).toFixed(1);
     const dG    = +(totals.g - goals.g).toFixed(1);
     const dL    = +(totals.l - goals.l).toFixed(1);
-    const fmtD  = (v, unit) => {
+    const fmtD  = (label, v, unit) => {
       const sign = v > 0 ? '+' : '';
-      return `<span style="color:#666;font-size:11px">${sign}${v}${unit}</span>`;
+      return `<span style="color:#666;font-size:11px">${label} ${sign}${v}${unit}</span>`;
     };
     const deltaRow = `
     <div class="hist-delta">
-      ${fmtD(dKcal, ' kcal')}
-      <span style="color:#555;font-size:11px">·</span>
-      ${fmtD(dP, 'g P')}
-      <span style="color:#555;font-size:11px">·</span>
-      ${fmtD(dG, 'g G')}
-      <span style="color:#555;font-size:11px">·</span>
-      ${fmtD(dL, 'g L')}
+      ${fmtD('', dKcal, ' kcal')}
+      <span style="color:#444;font-size:11px">·</span>
+      ${fmtD('P', dP, 'g')}
+      <span style="color:#444;font-size:11px">·</span>
+      ${fmtD('G', dG, 'g')}
+      <span style="color:#444;font-size:11px">·</span>
+      ${fmtD('L', dL, 'g')}
     </div>`;
     return `
     <div class="hist-card">
@@ -414,7 +416,6 @@ function renderHistory() {
         <span class="pill-sm" style="color:#f0c040">G ${totals.g}g</span>
         <span class="pill-sm" style="color:#e87070">L ${totals.l}g</span>
       </div>
-      <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
       ${deltaRow}
@@ -448,13 +449,13 @@ function renderFoodsAliments() {
     ? `<div class="sync-warning">⚠️ ${unsynced} aliment${unsynced>1?'s':''} ajouté${unsynced>1?'s':''} manuellement — pense à mettre à jour foods.csv depuis ton ordi</div>`
     : '';
 
-  // Filter — search on name only (strip brand prefix)
+  // Filter — search on name only (strip brand prefix), exclude virtual foods
   let filtered = q.length > 0
-    ? S.foods.filter(f => {
+    ? S.foods.filter(f => !f._virtual && (() => {
         const nom = f.name.indexOf(' — ') > -1 ? f.name.slice(f.name.indexOf(' — ')+3) : f.name;
         return nom.toLowerCase().includes(q.toLowerCase()) || f.name.toLowerCase().includes(q.toLowerCase());
-      })
-    : [...S.foods];
+      })())
+    : S.foods.filter(f => !f._virtual);
 
   // #4 — sort
   if (sort === 'alpha') {
@@ -736,9 +737,32 @@ function renderAddFoodModal() {
         recentSection = `
         <div class="recent-label">Récents</div>
         ${recentItems}
-        <div class="recent-divider"></div>
-        <div class="recent-label">Tous les aliments</div>`;
+        <div class="recent-divider"></div>`;
       }
+    }
+
+    // Fav meals section (always shown when no query, filtered when query)
+    let favSection = '';
+    const favFiltered = q.length >= 1
+      ? S.meals.filter(m => m.name.toLowerCase().includes(q.toLowerCase()))
+      : S.meals;
+    if (favFiltered.length) {
+      const favItems = favFiltered.map(m => {
+        const isQuick = !!m._quick;
+        const totals  = isQuick ? { kcal: m.kcal } : calcMacros(m.items);
+        return `<div class="food-item" data-action="addFavMealToRepas" data-meal-id="${m.id}">
+          <span class="food-item-name">${escHtml(m.name)}${isQuick ? ' ⚡' : ''}</span>
+          <span class="food-item-kcal">${totals.kcal} kcal</span>
+        </div>`;
+      }).join('');
+      favSection = `
+      <div class="recent-label">Repas favoris</div>
+      ${favItems}
+      <div class="recent-divider"></div>
+      <div class="recent-label">Tous les aliments</div>`;
+    } else if (!q) {
+      favSection = recentSection ? '' : '';
+      // If no fav meals and no recents, just show "Tous les aliments"
     }
 
     const addNew = q
@@ -746,13 +770,17 @@ function renderAddFoodModal() {
            data-name="${escHtml(q)}">➕ Ajouter "${escHtml(q)}" à ma base</button>`
       : '';
 
+    const allLabel = (!q && (recentSection || favSection))
+      ? `<div class="recent-label">Tous les aliments</div>`
+      : '';
+
     return `
     <h3 class="modal-title">Repas ${meal}</h3>
     <input id="food-search" class="search-input" type="search"
-      placeholder="Rechercher un aliment…" value="${escHtml(q)}"
+      placeholder="Rechercher un aliment ou repas…" value="${escHtml(q)}"
       data-action="filterFoods" autocomplete="off" autocorrect="off">
     <div class="food-list" style="padding-bottom:69px">
-      ${recentSection}
+      ${!q ? (recentSection + favSection + allLabel) : ''}
       ${items || (q ? addNew : '<p class="empty-state" style="padding:20px 0">Aucun résultat</p>')}
       ${items && q ? addNew : ''}
     </div>`;
@@ -1720,6 +1748,63 @@ function handleClick(e) {
     // ── Barcode
     case 'scanBarcode': scanBarcode(); break;
 
+    // ── #8 — AI prompt generator
+    case 'copyAiPrompt': {
+      const date    = el.dataset.date;
+      const day     = S.days[date];
+      if (!day) { showToast('Aucune donnée pour ce jour.'); break; }
+      const goals   = S.goals[day.type];
+      const totals  = calcMacros(allEntries(day));
+      const remKcal = goals.kcal - totals.kcal;
+      const remP    = +(goals.p - totals.p).toFixed(1);
+      const remG    = +(goals.g - totals.g).toFixed(1);
+      const remL    = +(goals.l - totals.l).toFixed(1);
+
+      // Build food list per meal
+      let mealsText = '';
+      for (let m = 1; m <= 6; m++) {
+        const entries = day.meals[m] || [];
+        if (!entries.length) continue;
+        mealsText += `\nRepas ${m} :\n`;
+        for (const e of entries) {
+          const f = S.foods.find(x => x.id === e.foodId);
+          if (!f) continue;
+          const qty = f.unitWeight ? `${+(e.grams/f.unitWeight).toFixed(1)} unité(s)` : `${e.grams}g`;
+          const mc  = calcMacros([e]);
+          mealsText += `  - ${f.name} (${qty}) → ${mc.kcal} kcal | P ${mc.p}g | G ${mc.g}g | L ${mc.l}g\n`;
+        }
+      }
+
+      const typeLabel = day.type === 'sport' ? 'Sport' : 'Repos';
+      const prompt = `Tu es un nutritionniste expert. Voici mon bilan nutritionnel du ${fmtDate(date)} (jour ${typeLabel}) :
+
+OBJECTIFS DU JOUR :
+- Calories : ${goals.kcal} kcal | Protéines : ${goals.p}g | Glucides : ${goals.g}g | Lipides : ${goals.l}g
+
+DÉJÀ CONSOMMÉ :
+- Calories : ${totals.kcal} kcal | Protéines : ${totals.p}g | Glucides : ${totals.g}g | Lipides : ${totals.l}g
+${mealsText}
+RESTE À COMBLER :
+- Calories : ${remKcal} kcal | Protéines : ${remP}g | Glucides : ${remG}g | Lipides : ${remL}g
+
+Propose-moi 5 idées de repas ou snacks simples et savoureux pour atteindre exactement mes objectifs restants. Pour chaque idée, indique les macros approximatives. Tiens compte de ce que j'ai déjà mangé pour varier les aliments.`;
+
+      navigator.clipboard.writeText(prompt).then(() => {
+        showToast('Prompt copié ! Colle-le dans ton IA 🤖');
+      }).catch(() => {
+        // Fallback: show in a temporary textarea
+        const ta = document.createElement('textarea');
+        ta.value = prompt;
+        ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Prompt copié ! Colle-le dans ton IA 🤖');
+      });
+      break;
+    }
+
     // ── Foods tab sub-tab
     case 'setFoodsSubTab':
       S.foodsSubTab = el.dataset.val;
@@ -1769,14 +1854,26 @@ function handleClick(e) {
       const { meal, date } = S.md;
       const day = getDay(date);
       if (favMeal._quick) {
-        // Quick meal: create a virtual food entry
-        const vf = { id: uid(), name: favMeal.name, kcal: favMeal.kcal, p: favMeal.p, g: favMeal.g, l: favMeal.l, unitWeight: null, _virtual: true };
+        // Quick meal: 1 unit = 100g of virtual food (kcal/p/g/l are per 100g)
+        const vf = { id: uid(), name: favMeal.name, kcal: favMeal.kcal, p: favMeal.p, g: favMeal.g, l: favMeal.l, unitWeight: 100, _virtual: true };
         S.foods.push(vf);
-        day.meals[meal].push({ foodId: vf.id, grams: 100 });
+        day.meals[meal].push({ foodId: vf.id, grams: 100 }); // 1 unit = 100g
       } else {
-        for (const it of favMeal.items) {
-          day.meals[meal].push({ foodId: it.foodId, grams: it.grams });
-        }
+        // Regular fav meal: compute totals, create virtual food with unitWeight=100
+        // so it shows "1 u." and 1 unit = entire meal's macros
+        const totals = calcMacros(favMeal.items);
+        const vf = {
+          id: uid(),
+          name: favMeal.name,
+          kcal: totals.kcal, // kcal for 100g = kcal of full meal (quantity will be 100g = 1 unit)
+          p: totals.p,
+          g: totals.g,
+          l: totals.l,
+          unitWeight: 100, // 1 unit = 100g
+          _virtual: true
+        };
+        S.foods.push(vf);
+        day.meals[meal].push({ foodId: vf.id, grams: 100 }); // 1 unit
       }
       save();
       S.modal = null; S.md = {};
