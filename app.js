@@ -227,17 +227,22 @@ function renderPill(label, val, goal, color, unit = 'g') {
   return `<span class="pill" style="--c:${color}">${label ? label + ' ' : ''}${display}</span>`;
 }
 
-// Pill showing delta (val - goal): red if over, color if under
-function renderPillDelta(val, goal, color, unit = 'g') {
-  const diff = goal - val; // positive = still needed, negative = exceeded
-  const over = diff < 0;
-  const sign = over ? '+' : '';
-  const abs  = Math.abs(Math.round(diff));
-  const display = `${sign}${abs}${unit}`;
-  const style = over
-    ? `background:rgba(232,112,112,0.15);color:#e87070;border-color:rgba(232,112,112,0.3)`
-    : `--c:${color}`;
-  return `<span class="pill" style="${style}">${display}</span>`;
+// Pills delta pour aujourd'hui : couleur fixe, signe +/- selon dépassement ou manque
+function renderPillDelta(val, goal, color, prefix, unit) {
+  const diff = val - goal;          // positive = dépassé, negative = manque
+  const sign = diff >= 0 ? '+' : ''; // '-' est déjà dans le nombre négatif
+  const rounded = Number.isInteger(diff) ? diff : +diff.toFixed(1);
+  const display = `${prefix}${sign}${rounded}${unit}`;
+  return `<span style="
+    display:inline-block;
+    font-size:12px;
+    font-weight:600;
+    padding:3px 8px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.06);
+    color:${color};
+    border:1px solid rgba(255,255,255,0.08);
+  ">${display}</span>`;
 }
 
 // ── Tab: Day View (Today & History edit) ─────────────────────
@@ -282,10 +287,10 @@ function renderDayView(date) {
       ${renderBar('Glucides',  totals.g, goals.g, '#f0c040')}
       ${renderBar('Lipides',   totals.l, goals.l, '#e87070')}
       <div class="pills-row">
-        ${renderPillDelta(totals.kcal, goals.kcal, '#aaaaaa', ' kcal')}
-        ${renderPillDelta(totals.p,    goals.p,    '#7eb8f7', 'g P')}
-        ${renderPillDelta(totals.g,    goals.g,    '#f0c040', 'g G')}
-        ${renderPillDelta(totals.l,    goals.l,    '#e87070', 'g L')}
+        ${renderPillDelta(totals.kcal, goals.kcal, '#aaaaaa', '',   ' kcal')}
+        ${renderPillDelta(totals.p,    goals.p,    '#7eb8f7', 'P ', 'g')}
+        ${renderPillDelta(totals.g,    goals.g,    '#f0c040', 'G ', 'g')}
+        ${renderPillDelta(totals.l,    goals.l,    '#e87070', 'L ', 'g')}
       </div>
     </div>
   </div>`;
@@ -415,7 +420,8 @@ function renderHistory() {
     const dL    = +(totals.l - goals.l).toFixed(1);
     const fmtHistPill = (label, d, unit) => {
       const sign = d > 0 ? '+' : '';
-      return `<span class="pill-sm" style="color:#555">${label}${sign}${d}${unit}</span>`;
+      const lbl  = label ? label + ' ' : '';
+      return `<span class="pill-sm" style="color:#555">${lbl}${sign}${d}${unit}</span>`;
     };
     return `
     <div class="hist-card">
