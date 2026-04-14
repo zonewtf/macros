@@ -679,6 +679,24 @@ function renderSettings() {
 
     <div class="settings-block">
       <div class="settings-block-head">
+        <span class="settings-label">Sauvegarde iCloud</span>
+      </div>
+      <p style="font-size:12px;color:#555;margin-bottom:12px;line-height:1.5">
+        Le fichier téléchargé se sauvegarde dans <strong style="color:#888">Fichiers → iCloud Drive</strong> si iCloud Drive est activé sur ton iPhone.
+      </p>
+      <button class="btn-confirm" style="margin-bottom:10px;font-size:14px" data-action="backupToiCloud">☁️ Sauvegarder maintenant</button>
+      <div style="font-size:12px;color:#555;margin-bottom:8px" id="last-backup-label">${(() => {
+        const d = localStorage.getItem('macros_last_backup');
+        return d ? `Dernière sauvegarde : ${new Date(d).toLocaleDateString('fr-FR', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}` : 'Aucune sauvegarde récente';
+      })()}</div>
+      <label class="btn-export" style="display:block;text-align:center;cursor:pointer">
+        ⬆️ Restaurer depuis un fichier
+        <input type="file" accept=".json" data-action="restoreFromFile" style="display:none">
+      </label>
+    </div>
+
+    <div class="settings-block">
+      <div class="settings-block-head">
         <span class="settings-label">Export des données</span>
       </div>
       <div style="font-size:12px;color:#666;margin-bottom:10px">Historique des jours</div>
@@ -1760,7 +1778,25 @@ function handleClick(e) {
       break;
     }
 
-    // ── Export (new split)
+    // ── Backup / Restore
+    case 'backupToiCloud': {
+      const now  = new Date();
+      const pad  = n => String(n).padStart(2,'0');
+      const name = `macros-backup-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+      const data = {
+        backupDate: now.toISOString(),
+        version: 'v1',
+        days:  S.days,
+        foods: S.foods,
+        meals: S.meals,
+        goals: S.goals
+      };
+      download(name, JSON.stringify(data, null, 2), 'application/json');
+      localStorage.setItem('macros_last_backup', now.toISOString());
+      showToast('☁️ Sauvegarde téléchargée ! Enregistre-la dans iCloud Drive.');
+      render(); // refresh last-backup label
+      break;
+    }
     case 'exportHistoryCSV': exportHistoryCSV(); break;
     case 'exportHistoryJSON': exportHistoryJSON(); break;
     case 'exportFoodsCSV': exportFoodsCSV(); break;
@@ -2063,6 +2099,39 @@ function handleInput(e) {
       </div>`).join('');
     const fl = document.querySelector('.food-list');
     if (fl) fl.innerHTML = searchItems;
+    return;
+  }
+
+  if (a === 'restoreFromFile') {
+    const file = el.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        // Validate structure
+        if (!data.days || !data.foods || !data.goals) {
+          showToast('❌ Fichier invalide ou corrompu.');
+          return;
+        }
+        // Confirm before overwriting
+        if (!confirm(`Restaurer la sauvegarde du ${new Date(data.backupDate || 0).toLocaleDateString('fr-FR')} ?\n\nToutes tes données actuelles seront remplacées.`)) return;
+        S.days  = data.days  || {};
+        S.foods = data.foods || [];
+        S.meals = data.meals || [];
+        S.goals = data.goals || {};
+        if (!S.goals.sport) S.goals.sport = { ...DEFAULT_GOALS.sport };
+        if (!S.goals.rest)  S.goals.rest  = { ...DEFAULT_GOALS.rest };
+        save();
+        showToast('✅ Données restaurées avec succès !');
+        render();
+        renderNav();
+      } catch {
+        showToast('❌ Impossible de lire le fichier.');
+      }
+    };
+    reader.readAsText(file);
+    el.value = ''; // reset so same file can be picked again
     return;
   }
 
@@ -2378,6 +2447,14 @@ async function init() {
       renderNav();
     }
   }, 30000);
+  // Remind to backup if more than 7 days since last backup
+  const lastBackup = localStorage.getItem('macros_last_backup');
+  const daysSince  = lastBackup
+    ? (Date.now() - new Date(lastBackup).getTime()) / 86400000
+    : Infinity;
+  if (daysSince > 7) {
+    setTimeout(() => showToast('☁️ Pense à sauvegarder tes données (Réglages)'), 2500);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
