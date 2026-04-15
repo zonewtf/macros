@@ -76,7 +76,7 @@ function fmtDateShort(ds) {
 
 function getDay(date) {
   if (!S.days[date]) {
-    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null };
+    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null, burned: null };
     save();
   }
   // Ensure all 6 meals exist (migration safety)
@@ -270,14 +270,18 @@ function renderDayView(date) {
        </div>
        <h2 class="day-title">${isTomorrow ? 'Demain — ' : ''}${fmtDate(date)}</h2>`;
 
-  // #3 — creatine button
-  const creatineBtn = isToday ? (() => {
-    const taken = day.creatine;
-    if (taken) {
-      return `<div class="creatine-taken">💪 Créatine prise à ${taken}</div>`;
-    }
-    return `<button class="btn-creatine" data-action="takeCreatine" data-date="${date}">💪 Marquer créatine prise</button>`;
-  })() : (day.creatine ? `<div class="creatine-taken">💪 Créatine prise à ${day.creatine}</div>` : '');
+  // Créatine + calories Watch — côte à côte
+  const creatineBtn = (() => {
+    const taken  = day.creatine;
+    const burned = day.burned;
+    const creatinePart = taken
+      ? `<div class="action-taken">💪🏼 ${taken}</div>`
+      : `<button class="btn-action-half" data-action="takeCreatine" data-date="${date}">💪🏼 Créatine</button>`;
+    const burnedPart = (burned !== null && burned !== undefined)
+      ? `<div class="action-taken">⌚ ${burned} kcal</div>`
+      : `<button class="btn-action-half" data-action="openBurnedInput" data-date="${date}">⌚ Watch</button>`;
+    return `<div class="action-row">${creatinePart}${burnedPart}</div>`;
+  })();
 
   const summary = `
   <div class="summary-card">
@@ -423,12 +427,27 @@ function renderHistory() {
       const lbl  = label ? label + ' ' : '';
       return `<span class="pill-sm" style="color:#555">${lbl}${sign}${d}${unit}</span>`;
     };
+    // Déficit net si calories Watch renseignées
+    const burned = day.burned;
+    const deficit = burned ? burned - totals.kcal : null;
+
+    // Avertissement si calories Watch manquantes (jour passé)
+    const missingBurned = !burned
+      ? `<button class="btn-add-burned" data-action="openBurnedInput" data-date="${d}">⌚ + calories Watch</button>`
+      : `<span class="pill-sm" style="color:#f0c040">⌚ ${burned} kcal dépensées</span>`;
+
+    const deficitLine = burned
+      ? `<div class="hist-deficit ${deficit > 0 ? 'deficit-ok' : 'deficit-over'}">
+           ${deficit > 0 ? `✅ Déficit : −${deficit} kcal` : `⚠️ Surplus : +${Math.abs(deficit)} kcal`}
+         </div>`
+      : '';
+
     return `
     <div class="hist-card">
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
-        ${day.creatine ? `<span title="Créatine prise">💪</span>` : ''}
+        ${day.creatine ? `<span title="Créatine prise">💪🏼</span>` : ''}
         <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
       </div>
       <div class="hist-macros">
@@ -436,6 +455,7 @@ function renderHistory() {
         <span class="pill-sm" style="color:#7eb8f7">P ${totals.p}g</span>
         <span class="pill-sm" style="color:#f0c040">G ${totals.g}g</span>
         <span class="pill-sm" style="color:#e87070">L ${totals.l}g</span>
+        ${missingBurned}
       </div>
       <div class="hist-macros" style="margin-top:5px">
         ${fmtHistPill('', dKcal, ' kcal')}
@@ -443,15 +463,64 @@ function renderHistory() {
         ${fmtHistPill('G', dG, 'g')}
         ${fmtHistPill('L', dL, 'g')}
       </div>
+      ${deficitLine}
       <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
     </div>`;
   }).join('');
 
+  // ── Résumé de la semaine courante
+  const weekSummary = (() => {
+    // Get last 7 days (today excluded from history, so we take the 7 most recent past days)
+    const recentDays = pastDates.slice(0, 7);
+    if (recentDays.length < 1) return '';
+    let totalKcal = 0, totalP = 0, totalG = 0, totalL = 0;
+    let totalBurned = 0, burnedCount = 0;
+    let sportCount = 0;
+    for (const d of recentDays) {
+      const day    = S.days[d];
+      const totals = calcMacros(allEntries(day));
+      totalKcal  += totals.kcal;
+      totalP     += totals.p;
+      totalG     += totals.g;
+      totalL     += totals.l;
+      if (day.type === 'sport') sportCount++;
+      if (day.burned) { totalBurned += day.burned; burnedCount++; }
+    }
+    const n      = recentDays.length;
+    const avgK   = Math.round(totalKcal / n);
+    const avgP   = +(totalP / n).toFixed(1);
+    const avgG   = +(totalG / n).toFixed(1);
+    const avgL   = +(totalL / n).toFixed(1);
+    const avgBurned = burnedCount > 0 ? Math.round(totalBurned / burnedCount) : null;
+    const avgDeficit = avgBurned ? avgBurned - avgK : null;
+    const deficitLine = avgDeficit !== null
+      ? `<div style="font-size:12px;margin-top:6px;color:${avgDeficit > 0 ? '#66ffaa' : '#e87070'}">
+           ${avgDeficit > 0 ? `Déficit moy. : −${avgDeficit} kcal/j` : `Surplus moy. : +${Math.abs(avgDeficit)} kcal/j`}
+         </div>`
+      : '';
+    return `
+    <div class="week-summary-card">
+      <div class="week-summary-head">
+        <span>📊 Moyenne ${n} derniers jours</span>
+        <span class="week-badges">${sportCount}⚡ · ${n - sportCount}🌙</span>
+      </div>
+      <div class="hist-macros" style="margin-top:8px">
+        <span class="hist-kcal">${avgK} kcal</span>
+        <span class="pill-sm" style="color:#7eb8f7">P ${avgP}g</span>
+        <span class="pill-sm" style="color:#f0c040">G ${avgG}g</span>
+        <span class="pill-sm" style="color:#e87070">L ${avgL}g</span>
+        ${avgBurned ? `<span class="pill-sm" style="color:#f0c040">⌚ ${avgBurned}</span>` : ''}
+      </div>
+      ${deficitLine}
+    </div>`;
+  })();
+
   return `
   <div class="view-history">
     <h2>Historique</h2>
+    ${weekSummary}
     ${tomorrowCard}
     ${pastHtml || '<p class="empty-state">Aucun historique pour l\'instant.<br>Commence à journaliser !</p>'}
   </div>`;
@@ -737,7 +806,8 @@ function renderModal() {
     case 'addFavMeal': content = renderAddFavMealModal();      break;
     case 'copyMeal':   content = renderCopyMealModal();        break;
     case 'deleteFoodConfirm': content = renderDeleteFoodConfirmModal(); break;
-    case 'quickMeal':  content = renderQuickMealModal();  break;
+    case 'quickMeal':   content = renderQuickMealModal();   break;
+    case 'burnedInput': content = renderBurnedInputModal(); break;
     default: return '';
   }
   return `
@@ -1235,6 +1305,20 @@ function renderQuickMealModal() {
        </div>`
     : `<button class="btn-confirm nav-spacer" data-action="saveQuickMeal">Enregistrer le repas</button>`
   }`;
+}
+
+function renderBurnedInputModal() {
+  const date   = S.md.date || '';
+  const burned = S.days[date]?.burned;
+  return `
+  <h3 class="modal-title">⌚ Calories dépensées</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:16px">Entre le total de calories actives brûlées d'après ton Apple Watch pour le ${fmtDate(date)}.</p>
+  <div class="form-group">
+    <label>Calories dépensées (kcal)</label>
+    <input type="number" class="form-input" id="burned-input"
+      value="${burned || ''}" placeholder="ex : 480" inputmode="decimal">
+  </div>
+  <button class="btn-confirm nav-spacer" data-action="saveBurned">Enregistrer</button>`;
 }
 
 function renderDeleteFoodConfirmModal() {
@@ -1817,6 +1901,25 @@ function handleClick(e) {
       day.creatine = `${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
       save();
       showToast(`💪 Créatine prise à ${day.creatine} !`);
+      render();
+      break;
+    }
+
+    case 'openBurnedInput':
+      S.modal = 'burnedInput';
+      S.md    = { date: el.dataset.date };
+      render();
+      setTimeout(() => document.getElementById('burned-input')?.focus(), 80);
+      break;
+
+    case 'saveBurned': {
+      const val  = +document.getElementById('burned-input')?.value || 0;
+      const date = S.md.date;
+      const day  = getDay(date);
+      day.burned = val > 0 ? val : null;
+      save();
+      S.modal = null; S.md = {};
+      showToast(val > 0 ? `⌚ ${val} kcal enregistrées !` : 'Valeur supprimée.');
       render();
       break;
     }
