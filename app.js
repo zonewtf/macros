@@ -773,6 +773,7 @@ function renderSettings() {
         <button class="btn-export" data-action="exportHistoryCSV">⬇ CSV Historique</button>
         <button class="btn-export" data-action="exportHistoryJSON">⬇ JSON Historique</button>
       </div>
+      <button class="btn-export" style="width:100%;margin-bottom:10px;border-color:rgba(200,216,240,0.2);color:#7eb8f7" data-action="exportHistoryMarkdown">🤖 Markdown pour IA (complet)</button>
       <div style="font-size:12px;color:#666;margin-bottom:10px">Ma base d'aliments</div>
       <div class="export-row">
         <button class="btn-export" data-action="exportFoodsCSV">⬇ CSV Aliments</button>
@@ -1881,10 +1882,11 @@ function handleClick(e) {
       render(); // refresh last-backup label
       break;
     }
-    case 'exportHistoryCSV': exportHistoryCSV(); break;
-    case 'exportHistoryJSON': exportHistoryJSON(); break;
-    case 'exportFoodsCSV': exportFoodsCSV(); break;
-    case 'exportFullJSON': exportFullJSON(); break;
+    case 'exportHistoryCSV':      exportHistoryCSV();      break;
+    case 'exportHistoryJSON':     exportHistoryJSON();     break;
+    case 'exportHistoryMarkdown': exportHistoryMarkdown(); break;
+    case 'exportFoodsCSV':        exportFoodsCSV();        break;
+    case 'exportFullJSON':        exportFullJSON();        break;
     // legacy compat
     case 'exportCSV':  exportHistoryCSV(); break;
     case 'exportJSON': exportFullJSON();   break;
@@ -2331,32 +2333,242 @@ function updateMacrosPreview() {
 
 // ── Export ────────────────────────────────────────────────────
 
+// ── Helpers export ───────────────────────────────────────────
+
+function buildDayExportData(date, day) {
+  const goals  = S.goals[day.type];
+  const totals = calcMacros(allEntries(day));
+  const burned = day.burned || null;
+  const deficit = burned !== null ? burned - totals.kcal : null;
+
+  // Per-meal detail with food names resolved
+  const mealsDetail = {};
+  for (let m = 1; m <= 6; m++) {
+    const entries = day.meals[m] || [];
+    if (!entries.length) continue;
+    const mTotals = calcMacros(entries);
+    mealsDetail[`Repas ${m}`] = {
+      total: mTotals,
+      aliments: entries.map(e => {
+        const f  = S.foods.find(x => x.id === e.foodId);
+        if (!f) return null;
+        const mc = calcMacros([e]);
+        const qty = f.unitWeight
+          ? `${+(e.grams / f.unitWeight).toFixed(1)} unité(s) (${e.grams}g)`
+          : `${e.grams}g`;
+        return { nom: f.name, quantite: qty, kcal: mc.kcal, p: mc.p, g: mc.g, l: mc.l };
+      }).filter(Boolean)
+    };
+  }
+
+  return {
+    date,
+    jour: fmtDate(date),
+    type: day.type,
+    creatine: day.creatine || null,
+    calories_depensees_watch: burned,
+    deficit_net_kcal: deficit,
+    objectifs: { kcal: goals.kcal, p: goals.p, g: goals.g, l: goals.l },
+    consomme:  { kcal: totals.kcal, p: totals.p, g: totals.g, l: totals.l },
+    delta:     {
+      kcal: totals.kcal - goals.kcal,
+      p: +(totals.p - goals.p).toFixed(1),
+      g: +(totals.g - goals.g).toFixed(1),
+      l: +(totals.l - goals.l).toFixed(1)
+    },
+    repas: mealsDetail
+  };
+}
+
+// ── Export CSV Historique (étendu) ────────────────────────────
+
 function exportHistoryCSV() {
-  const header = ['Date', 'Type', 'Calories', 'Protéines (g)', 'Glucides (g)', 'Lipides (g)'];
-  const rows   = Object.entries(S.days)
+  const header = [
+    'Date', 'Jour', 'Type',
+    'Kcal_consommees', 'Kcal_objectif', 'Kcal_delta',
+    'P_g', 'P_objectif', 'P_delta',
+    'G_g', 'G_objectif', 'G_delta',
+    'L_g', 'L_objectif', 'L_delta',
+    'Calories_Watch', 'Deficit_net',
+    'Creatine',
+    'Repas1_kcal', 'Repas2_kcal', 'Repas3_kcal',
+    'Repas4_kcal', 'Repas5_kcal', 'Repas6_kcal'
+  ];
+
+  const rows = Object.entries(S.days)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, day]) => {
-      const t = calcMacros(allEntries(day));
-      return [date, day.type, t.kcal, t.p, t.g, t.l].join(',');
+      const d = buildDayExportData(date, day);
+      const mKcal = [1,2,3,4,5,6].map(m => {
+        const entries = day.meals[m] || [];
+        return entries.length ? calcMacros(entries).kcal : '';
+      });
+      return [
+        date, `"${d.jour}"`, d.type,
+        d.consomme.kcal, d.objectifs.kcal, d.delta.kcal,
+        d.consomme.p, d.objectifs.p, d.delta.p,
+        d.consomme.g, d.objectifs.g, d.delta.g,
+        d.consomme.l, d.objectifs.l, d.delta.l,
+        d.calories_depensees_watch ?? '',
+        d.deficit_net_kcal ?? '',
+        d.creatine ? 'Oui' : 'Non',
+        ...mKcal
+      ].join(',');
     });
+
   const csv = [header.join(','), ...rows].join('\n');
-  download('macros-historique.csv', csv, 'text/csv;charset=utf-8;');
-  showToast('Historique CSV exporté !');
+  download('macros-historique-complet.csv', csv, 'text/csv;charset=utf-8;');
+  showToast('CSV historique complet exporté !');
 }
+
+// ── Export JSON Historique (étendu) ───────────────────────────
 
 function exportHistoryJSON() {
-  const data = { exportDate: new Date().toISOString(), days: S.days, goals: S.goals };
-  download('macros-historique.json', JSON.stringify(data, null, 2), 'application/json');
-  showToast('Historique JSON exporté !');
+  const sortedDates = Object.keys(S.days).sort((a, b) => b.localeCompare(a));
+  const days = sortedDates.map(date => buildDayExportData(date, S.days[date]));
+
+  // Weekly summaries
+  const weeks = {};
+  for (const d of days) {
+    const dt   = new Date(d.date + 'T12:00:00');
+    const mon  = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    const wKey = mon.toISOString().slice(0, 10);
+    if (!weeks[wKey]) weeks[wKey] = { debut: wKey, jours: [], totaux: { kcal: 0, p: 0, g: 0, l: 0, burned: 0, burnedCount: 0, sport: 0, repos: 0 } };
+    weeks[wKey].jours.push(d.date);
+    weeks[wKey].totaux.kcal   += d.consomme.kcal;
+    weeks[wKey].totaux.p      += d.consomme.p;
+    weeks[wKey].totaux.g      += d.consomme.g;
+    weeks[wKey].totaux.l      += d.consomme.l;
+    if (d.calories_depensees_watch) { weeks[wKey].totaux.burned += d.calories_depensees_watch; weeks[wKey].totaux.burnedCount++; }
+    d.type === 'sport' ? weeks[wKey].totaux.sport++ : weeks[wKey].totaux.repos++;
+  }
+  const weeklySummaries = Object.values(weeks)
+    .sort((a, b) => b.debut.localeCompare(a.debut))
+    .map(w => {
+      const n = w.jours.length;
+      const avgBurned = w.totaux.burnedCount > 0 ? Math.round(w.totaux.burned / w.totaux.burnedCount) : null;
+      return {
+        semaine_debut: w.debut,
+        nb_jours: n,
+        repartition: `${w.totaux.sport} sport · ${w.totaux.repos} repos`,
+        moyennes: {
+          kcal: Math.round(w.totaux.kcal / n),
+          p:    +(w.totaux.p / n).toFixed(1),
+          g:    +(w.totaux.g / n).toFixed(1),
+          l:    +(w.totaux.l / n).toFixed(1),
+          calories_watch: avgBurned
+        },
+        deficit_moyen: avgBurned ? avgBurned - Math.round(w.totaux.kcal / n) : null
+      };
+    });
+
+  const data = {
+    export_date: new Date().toISOString(),
+    app: 'Mes Macros',
+    objectifs: S.goals,
+    resume_global: {
+      nb_jours_total: days.length,
+      periode: days.length ? `${days[days.length-1].date} → ${days[0].date}` : 'N/A'
+    },
+    resumés_hebdomadaires: weeklySummaries,
+    jours: days
+  };
+
+  download('macros-historique-complet.json', JSON.stringify(data, null, 2), 'application/json');
+  showToast('JSON historique complet exporté !');
 }
 
+// ── Export Markdown (pour analyse IA) ─────────────────────────
+
+function exportHistoryMarkdown() {
+  const sortedDates = Object.keys(S.days).sort((a, b) => b.localeCompare(a));
+  if (!sortedDates.length) { showToast('Aucun historique à exporter.'); return; }
+
+  const lines = [];
+  lines.push('# Mes Macros — Export Historique Nutritionnel');
+  lines.push(`\n*Exporté le ${new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'})}*\n`);
+  lines.push('---\n');
+
+  // Objectifs
+  lines.push('## Objectifs');
+  for (const [type, g] of [['Sport ⚡', S.goals.sport], ['Repos 🌙', S.goals.rest]]) {
+    lines.push(`\n**${type}** — ${g.kcal} kcal | P ${g.p}g | G ${g.g}g | L ${g.l}g`);
+  }
+  lines.push('\n---\n');
+
+  // Weekly summaries
+  const weeks = {};
+  for (const date of sortedDates) {
+    const dt  = new Date(date + 'T12:00:00');
+    const mon = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    const wKey = mon.toISOString().slice(0, 10);
+    if (!weeks[wKey]) weeks[wKey] = [];
+    weeks[wKey].push(date);
+  }
+
+  lines.push('## Résumés hebdomadaires\n');
+  for (const [wKey, wDates] of Object.entries(weeks).sort((a,b) => b[0].localeCompare(a[0]))) {
+    const n = wDates.length;
+    let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
+    for (const d of wDates) {
+      const day = S.days[d];
+      const t = calcMacros(allEntries(day));
+      sumK += t.kcal; sumP += t.p; sumG += t.g; sumL += t.l;
+      if (day.burned) { sumB += day.burned; bCount++; }
+      if (day.type === 'sport') sport++;
+    }
+    const avgK = Math.round(sumK/n), avgB = bCount ? Math.round(sumB/bCount) : null;
+    const def  = avgB ? avgB - avgK : null;
+    const wEnd = new Date(wKey); wEnd.setDate(wEnd.getDate() + n - 1);
+    lines.push(`### Semaine du ${new Date(wKey+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})} au ${wEnd.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`);
+    lines.push(`- ${n} jours : ${sport} Sport · ${n-sport} Repos`);
+    lines.push(`- Moy. kcal ingérées : **${avgK} kcal** | P ${+(sumP/n).toFixed(1)}g | G ${+(sumG/n).toFixed(1)}g | L ${+(sumL/n).toFixed(1)}g`);
+    if (avgB) lines.push(`- Moy. kcal dépensées (Watch) : ${avgB} kcal`);
+    if (def)  lines.push(`- Déficit moyen : **${def > 0 ? '−'+def : '+'+Math.abs(def)} kcal/j**`);
+    lines.push('');
+  }
+
+  lines.push('---\n');
+  lines.push('## Détail par jour\n');
+
+  for (const date of sortedDates) {
+    const d = buildDayExportData(date, S.days[date]);
+    const typeLabel = d.type === 'sport' ? 'Sport ⚡' : 'Repos 🌙';
+    lines.push(`### ${d.jour} — ${typeLabel}`);
+
+    // Summary line
+    const deltaSign = v => v > 0 ? `+${v}` : `${v}`;
+    lines.push(`**Consommé :** ${d.consomme.kcal} kcal | P ${d.consomme.p}g | G ${d.consomme.g}g | L ${d.consomme.l}g`);
+    lines.push(`**Objectif :** ${d.objectifs.kcal} kcal | P ${d.objectifs.p}g | G ${d.objectifs.g}g | L ${d.objectifs.l}g`);
+    lines.push(`**Delta :** ${deltaSign(d.delta.kcal)} kcal | P ${deltaSign(d.delta.p)}g | G ${deltaSign(d.delta.g)}g | L ${deltaSign(d.delta.l)}g`);
+
+    if (d.calories_depensees_watch) {
+      lines.push(`**Watch :** ${d.calories_depensees_watch} kcal dépensées → Déficit net : ${d.deficit_net_kcal > 0 ? '−'+d.deficit_net_kcal : '+'+Math.abs(d.deficit_net_kcal)} kcal`);
+    }
+    if (d.creatine) lines.push(`**Créatine :** prise à ${d.creatine} 💪🏼`);
+
+    // Meals detail
+    for (const [mealName, mealData] of Object.entries(d.repas)) {
+      lines.push(`\n**${mealName}** (${mealData.total.kcal} kcal | P ${mealData.total.p}g | G ${mealData.total.g}g | L ${mealData.total.l}g)`);
+      for (const item of mealData.aliments) {
+        lines.push(`  - ${item.nom} — ${item.quantite} → ${item.kcal} kcal | P ${item.p}g | G ${item.g}g | L ${item.l}g`);
+      }
+    }
+    lines.push('');
+  }
+
+  download('macros-historique-ia.md', lines.join('\n'), 'text/markdown;charset=utf-8;');
+  showToast('Export Markdown pour IA téléchargé !');
+}
+
+// ── Export CSV Aliments ───────────────────────────────────────
+
 function exportFoodsCSV() {
-  // Same format as foods.csv so it can be re-imported
   const header = 'Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire';
   const rows = S.foods
-    .filter(f => !f._virtual) // skip quick-add virtual entries
+    .filter(f => !f._virtual)
     .map(f => {
-      const sep   = f.name.indexOf(' — ');
+      const sep    = f.name.indexOf(' — ');
       const marque = sep > -1 ? f.name.slice(0, sep) : '';
       const nom    = sep > -1 ? f.name.slice(sep + 3) : f.name;
       return [marque, nom, f.kcal, f.p, f.g, f.l, f.unitWeight || ''].join(',');
@@ -2366,9 +2578,12 @@ function exportFoodsCSV() {
   showToast('Aliments CSV exporté !');
 }
 
+// ── Export JSON Complet ───────────────────────────────────────
+
 function exportFullJSON() {
   const data = {
-    exportDate: new Date().toISOString(),
+    export_date: new Date().toISOString(),
+    app: 'Mes Macros',
     days:  S.days,
     foods: S.foods,
     meals: S.meals,
