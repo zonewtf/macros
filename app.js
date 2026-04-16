@@ -376,6 +376,52 @@ function renderDayView(date) {
 
 // ── Tab: History ──────────────────────────────────────────────
 
+// ── Week helpers ──────────────────────────────────────────────
+
+function getISOWeek(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay() || 7; // Mon=1 … Sun=7
+  d.setDate(d.getDate() + 4 - day); // Thursday of current week
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return {
+    week: Math.ceil(((d - yearStart) / 86400000 + 1) / 7),
+    year: d.getFullYear(),
+    monday: (() => {
+      const m = new Date(dateStr + 'T12:00:00');
+      const wd = m.getDay() || 7;
+      m.setDate(m.getDate() - wd + 1);
+      return m.toISOString().slice(0, 10);
+    })()
+  };
+}
+
+function weekLabel(weekNum, mondayStr, sundayStr) {
+  const fmt = ds => new Date(ds + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const monD = new Date(mondayStr + 'T12:00:00');
+  const sunD = new Date(sundayStr + 'T12:00:00');
+  const monYear = monD.getFullYear();
+  const sunYear = sunD.getFullYear();
+  const yearSuffix = monYear !== sunYear ? ` ${String(sunYear).slice(2)}` : '';
+  return `Semaine ${weekNum} — ${fmt(mondayStr)} au ${fmt(sundayStr)}${yearSuffix}`;
+}
+
+function groupDaysByWeek(dates) {
+  // Returns array of { weekNum, year, monday, sunday, label, dates[] } sorted newest first
+  const map = {};
+  for (const d of dates) {
+    const { week, year, monday } = getISOWeek(d);
+    const key = `${year}-${String(week).padStart(2, '0')}`;
+    if (!map[key]) {
+      const sun = new Date(monday + 'T12:00:00');
+      sun.setDate(sun.getDate() + 6);
+      const sunday = sun.toISOString().slice(0, 10);
+      map[key] = { weekNum: week, year, monday, sunday, label: weekLabel(week, monday, sunday), dates: [] };
+    }
+    map[key].dates.push(d);
+  }
+  return Object.values(map).sort((a, b) => b.monday.localeCompare(a.monday));
+}
+
 function renderHistory() {
   if (S.histSub === 'edit' && S.editDate) {
     return renderDayView(S.editDate);
@@ -384,7 +430,6 @@ function renderHistory() {
   const tom    = tomorrowStr();
   const tomDay = getDay(tom);
   const tomT   = calcMacros(allEntries(tomDay));
-  const tomG   = S.goals[tomDay.type];
   const tomBadge = tomDay.type === 'sport'
     ? `<span class="badge-sport">Sport ⚡</span>`
     : `<span class="badge-rest">Repos 🌙</span>`;
@@ -408,7 +453,12 @@ function renderHistory() {
     .filter(d => d < todayStr())
     .sort((a, b) => b.localeCompare(a));
 
-  const pastHtml = pastDates.map(d => {
+  if (!pastDates.length) {
+    return `<div class="view-history"><h2>Historique</h2>${tomorrowCard}<p class="empty-state">Aucun historique pour l'instant.<br>Commence à journaliser !</p></div>`;
+  }
+
+  // Helper: render a single day card
+  const renderDayCard = (d) => {
     const day    = S.days[d];
     const totals = calcMacros(allEntries(day));
     const goals  = S.goals[day.type];
@@ -416,32 +466,25 @@ function renderHistory() {
     const badge  = day.type === 'sport'
       ? `<span class="badge-sport">Sport ⚡</span>`
       : `<span class="badge-rest">Repos 🌙</span>`;
-
-    // delta vs goals — shown inline in pills
-    const dKcal = totals.kcal - goals.kcal;
-    const dP    = +(totals.p - goals.p).toFixed(1);
-    const dG    = +(totals.g - goals.g).toFixed(1);
-    const dL    = +(totals.l - goals.l).toFixed(1);
-    const fmtHistPill = (label, d, unit) => {
-      const sign = d > 0 ? '+' : '';
+    const dKcal  = totals.kcal - goals.kcal;
+    const dP     = +(totals.p - goals.p).toFixed(1);
+    const dG     = +(totals.g - goals.g).toFixed(1);
+    const dL     = +(totals.l - goals.l).toFixed(1);
+    const fmtP   = (label, v, unit) => {
+      const sign = v > 0 ? '+' : '';
       const lbl  = label ? label + ' ' : '';
-      return `<span class="pill-sm" style="color:#555">${lbl}${sign}${d}${unit}</span>`;
+      return `<span class="pill-sm" style="color:#555">${lbl}${sign}${v}${unit}</span>`;
     };
-    // Déficit net si calories Watch renseignées
-    const burned = day.burned;
+    const burned  = day.burned;
     const deficit = burned ? burned - totals.kcal : null;
-
-    // Avertissement si calories Watch manquantes (jour passé)
     const missingBurned = !burned
-      ? `<button class="btn-add-burned" data-action="openBurnedInput" data-date="${d}">⌚ + calories Watch</button>`
-      : `<span class="pill-sm" style="color:#f0c040">⌚ ${burned} kcal dépensées</span>`;
-
+      ? `<button class="btn-add-burned" data-action="openBurnedInput" data-date="${d}">⌚ +Watch</button>`
+      : `<span class="pill-sm" style="color:#f0c040">⌚ ${burned} kcal</span>`;
     const deficitLine = burned
       ? `<div class="hist-deficit ${deficit > 0 ? 'deficit-ok' : 'deficit-over'}">
            ${deficit > 0 ? `✅ Déficit : −${deficit} kcal` : `⚠️ Surplus : +${Math.abs(deficit)} kcal`}
          </div>`
       : '';
-
     return `
     <div class="hist-card">
       <div class="hist-card-head">
@@ -458,71 +501,71 @@ function renderHistory() {
         ${missingBurned}
       </div>
       <div class="hist-macros" style="margin-top:5px">
-        ${fmtHistPill('', dKcal, ' kcal')}
-        ${fmtHistPill('P', dP, 'g')}
-        ${fmtHistPill('G', dG, 'g')}
-        ${fmtHistPill('L', dL, 'g')}
+        ${fmtP('', dKcal, ' kcal')}
+        ${fmtP('P', dP, 'g')}
+        ${fmtP('G', dG, 'g')}
+        ${fmtP('L', dL, 'g')}
       </div>
       ${deficitLine}
       <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
     </div>`;
-  }).join('');
+  };
 
-  // ── Résumé de la semaine courante
-  const weekSummary = (() => {
-    // Get last 7 days (today excluded from history, so we take the 7 most recent past days)
-    const recentDays = pastDates.slice(0, 7);
-    if (recentDays.length < 1) return '';
-    let totalKcal = 0, totalP = 0, totalG = 0, totalL = 0;
-    let totalBurned = 0, burnedCount = 0;
-    let sportCount = 0;
-    for (const d of recentDays) {
-      const day    = S.days[d];
-      const totals = calcMacros(allEntries(day));
-      totalKcal  += totals.kcal;
-      totalP     += totals.p;
-      totalG     += totals.g;
-      totalL     += totals.l;
-      if (day.type === 'sport') sportCount++;
-      if (day.burned) { totalBurned += day.burned; burnedCount++; }
+  // Helper: render week summary card
+  const renderWeekSummary = (wDates, label) => {
+    const n = wDates.length;
+    let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
+    for (const d of wDates) {
+      const day = S.days[d];
+      const t = calcMacros(allEntries(day));
+      sumK += t.kcal; sumP += t.p; sumG += t.g; sumL += t.l;
+      if (day.burned) { sumB += day.burned; bCount++; }
+      if (day.type === 'sport') sport++;
     }
-    const n      = recentDays.length;
-    const avgK   = Math.round(totalKcal / n);
-    const avgP   = +(totalP / n).toFixed(1);
-    const avgG   = +(totalG / n).toFixed(1);
-    const avgL   = +(totalL / n).toFixed(1);
-    const avgBurned = burnedCount > 0 ? Math.round(totalBurned / burnedCount) : null;
-    const avgDeficit = avgBurned ? avgBurned - avgK : null;
-    const deficitLine = avgDeficit !== null
-      ? `<div style="font-size:12px;margin-top:6px;color:${avgDeficit > 0 ? '#66ffaa' : '#e87070'}">
-           ${avgDeficit > 0 ? `Déficit moy. : −${avgDeficit} kcal/j` : `Surplus moy. : +${Math.abs(avgDeficit)} kcal/j`}
+    const avgK = Math.round(sumK / n);
+    const avgP = +(sumP / n).toFixed(1);
+    const avgG = +(sumG / n).toFixed(1);
+    const avgL = +(sumL / n).toFixed(1);
+    const avgB = bCount > 0 ? Math.round(sumB / bCount) : null;
+    const def  = avgB ? avgB - avgK : null;
+    const defLine = def !== null
+      ? `<div style="font-size:12px;margin-top:5px;color:${def > 0 ? '#66ffaa' : '#e87070'}">
+           ${def > 0 ? `Déficit moy. −${def} kcal/j` : `Surplus moy. +${Math.abs(def)} kcal/j`}
          </div>`
       : '';
     return `
     <div class="week-summary-card">
       <div class="week-summary-head">
-        <span>📊 Moyenne ${n} derniers jours</span>
-        <span class="week-badges">${sportCount}⚡ · ${n - sportCount}🌙</span>
+        <span>${label}</span>
+        <span class="week-badges">${sport}⚡ ${n - sport}🌙 · ${n}j</span>
       </div>
       <div class="hist-macros" style="margin-top:8px">
-        <span class="hist-kcal">${avgK} kcal</span>
+        <span class="hist-kcal">${avgK} kcal/j</span>
         <span class="pill-sm" style="color:#7eb8f7">P ${avgP}g</span>
         <span class="pill-sm" style="color:#f0c040">G ${avgG}g</span>
         <span class="pill-sm" style="color:#e87070">L ${avgL}g</span>
-        ${avgBurned ? `<span class="pill-sm" style="color:#f0c040">⌚ ${avgBurned}</span>` : ''}
+        ${avgB ? `<span class="pill-sm" style="color:#f0c040">⌚ ${avgB}</span>` : ''}
       </div>
-      ${deficitLine}
+      ${defLine}
     </div>`;
-  })();
+  };
+
+  // Group by week and render
+  const weekGroups = groupDaysByWeek(pastDates);
+  const html = weekGroups.map(wg => {
+    const sortedDates = wg.dates.sort((a, b) => b.localeCompare(a));
+    const daySummary  = renderWeekSummary(sortedDates, wg.label);
+    const dayCards    = sortedDates.map(renderDayCard).join('');
+    return daySummary + dayCards;
+  }).join('');
 
   return `
   <div class="view-history">
     <h2>Historique</h2>
-    ${weekSummary}
     ${tomorrowCard}
-    ${pastHtml || '<p class="empty-state">Aucun historique pour l\'instant.<br>Commence à journaliser !</p>'}
+    ${html}
   </div>`;
 }
 
@@ -2447,7 +2490,11 @@ function exportHistoryJSON() {
     .map(w => {
       const n = w.jours.length;
       const avgBurned = w.totaux.burnedCount > 0 ? Math.round(w.totaux.burned / w.totaux.burnedCount) : null;
+      const sun = new Date(w.debut + 'T12:00:00'); sun.setDate(sun.getDate() + 6);
+      const sundayStr = sun.toISOString().slice(0, 10);
+      const { week } = getISOWeek(w.debut);
       return {
+        semaine: weekLabel(week, w.debut, sundayStr),
         semaine_debut: w.debut,
         nb_jours: n,
         repartition: `${w.totaux.sport} sport · ${w.totaux.repos} repos`,
@@ -2507,7 +2554,9 @@ function exportHistoryMarkdown() {
   }
 
   lines.push('## Résumés hebdomadaires\n');
-  for (const [wKey, wDates] of Object.entries(weeks).sort((a,b) => b[0].localeCompare(a[0]))) {
+  const wGroups = groupDaysByWeek(sortedDates);
+  for (const wg of wGroups) {
+    const wDates = wg.dates.sort((a, b) => a.localeCompare(b));
     const n = wDates.length;
     let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
     for (const d of wDates) {
@@ -2519,8 +2568,7 @@ function exportHistoryMarkdown() {
     }
     const avgK = Math.round(sumK/n), avgB = bCount ? Math.round(sumB/bCount) : null;
     const def  = avgB ? avgB - avgK : null;
-    const wEnd = new Date(wKey); wEnd.setDate(wEnd.getDate() + n - 1);
-    lines.push(`### Semaine du ${new Date(wKey+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})} au ${wEnd.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`);
+    lines.push(`### ${wg.label}`);
     lines.push(`- ${n} jours : ${sport} Sport · ${n-sport} Repos`);
     lines.push(`- Moy. kcal ingérées : **${avgK} kcal** | P ${+(sumP/n).toFixed(1)}g | G ${+(sumG/n).toFixed(1)}g | L ${+(sumL/n).toFixed(1)}g`);
     if (avgB) lines.push(`- Moy. kcal dépensées (Watch) : ${avgB} kcal`);
