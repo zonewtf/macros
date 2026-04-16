@@ -17,6 +17,8 @@ let S = {
   viewDate:         '',
   histSub:          'list',
   editDate:         null,
+  histSearch:       '',            // search query in history
+  collapsedWeeks:   {},            // key "YYYY-WW" → true when collapsed
   modal:            null,
   md:               {},
   searchQ:          '',
@@ -427,9 +429,10 @@ function renderHistory() {
     return renderDayView(S.editDate);
   }
 
-  const tom    = tomorrowStr();
-  const tomDay = getDay(tom);
-  const tomT   = calcMacros(allEntries(tomDay));
+  const today   = todayStr();
+  const tom     = tomorrowStr();
+  const tomDay  = getDay(tom);
+  const tomT    = calcMacros(allEntries(tomDay));
   const tomBadge = tomDay.type === 'sport'
     ? `<span class="badge-sport">Sport ⚡</span>`
     : `<span class="badge-rest">Repos 🌙</span>`;
@@ -449,16 +452,8 @@ function renderHistory() {
     </div>
   </div>`;
 
-  const pastDates = Object.keys(S.days)
-    .filter(d => d < todayStr())
-    .sort((a, b) => b.localeCompare(a));
-
-  if (!pastDates.length) {
-    return `<div class="view-history"><h2>Historique</h2>${tomorrowCard}<p class="empty-state">Aucun historique pour l'instant.<br>Commence à journaliser !</p></div>`;
-  }
-
-  // Helper: render a single day card
-  const renderDayCard = (d) => {
+  // ── Render a single day card ────────────────────────────────
+  const renderDayCard = (d, highlight = '') => {
     const day    = S.days[d];
     const totals = calcMacros(allEntries(day));
     const goals  = S.goals[day.type];
@@ -485,8 +480,25 @@ function renderHistory() {
            ${deficit > 0 ? `✅ Déficit : −${deficit} kcal` : `⚠️ Surplus : +${Math.abs(deficit)} kcal`}
          </div>`
       : '';
+
+    // Highlight matching food names in search mode
+    const highlightItems = highlight ? (() => {
+      const q = highlight.toLowerCase();
+      const matches = [];
+      for (let m = 1; m <= 6; m++) {
+        for (const e of (day.meals[m] || [])) {
+          const f = S.foods.find(x => x.id === e.foodId);
+          if (f && f.name.toLowerCase().includes(q)) {
+            const mc = calcMacros([e]);
+            matches.push(`<span style="font-size:11px;color:#7eb8f7">↳ Repas ${m} : ${escHtml(f.name)} (${mc.kcal} kcal)</span>`);
+          }
+        }
+      }
+      return matches.length ? `<div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">${matches.join('')}</div>` : '';
+    })() : '';
+
     return `
-    <div class="hist-card">
+    <div class="hist-card${highlight ? ' hist-card-search-match' : ''}">
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
@@ -507,14 +519,15 @@ function renderHistory() {
         ${fmtP('L', dL, 'g')}
       </div>
       ${deficitLine}
+      ${highlightItems}
       <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
       </div>
     </div>`;
   };
 
-  // Helper: render week summary card
-  const renderWeekSummary = (wDates, label) => {
+  // ── Render week summary header ──────────────────────────────
+  const renderWeekHeader = (wDates, wg, isCurrent, isCollapsed) => {
     const n = wDates.length;
     let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
     for (const d of wDates) {
@@ -535,11 +548,19 @@ function renderHistory() {
            ${def > 0 ? `Déficit moy. −${def} kcal/j` : `Surplus moy. +${Math.abs(def)} kcal/j`}
          </div>`
       : '';
+    const weekKey = `${wg.year}-${String(wg.weekNum).padStart(2,'0')}`;
+    const toggleBtn = !isCurrent
+      ? `<button class="week-collapse-btn" data-action="toggleWeek" data-key="${weekKey}">${isCollapsed ? '▸' : '▾'}</button>`
+      : '';
+    const label = isCurrent ? `📅 Semaine en cours — ${wg.label.replace(/^Semaine \d+ — /, '')}` : wg.label;
     return `
-    <div class="week-summary-card">
-      <div class="week-summary-head">
-        <span>${label}</span>
-        <span class="week-badges">${sport}⚡ ${n - sport}🌙 · ${n}j</span>
+    <div class="week-header-block ${isCurrent ? 'week-current' : ''}">
+      <div class="week-header-row" ${!isCurrent ? `data-action="toggleWeek" data-key="${weekKey}"` : ''}>
+        <div class="week-header-left">
+          <span class="week-label">${label}</span>
+          <span class="week-badges">${sport}⚡ ${n-sport}🌙 · ${n}j</span>
+        </div>
+        ${toggleBtn}
       </div>
       <div class="hist-macros" style="margin-top:8px">
         <span class="hist-kcal">${avgK} kcal/j</span>
@@ -552,20 +573,85 @@ function renderHistory() {
     </div>`;
   };
 
-  // Group by week and render
+  // ── Search mode ─────────────────────────────────────────────
+  const q = (S.histSearch || '').trim().toLowerCase();
+  if (q) {
+    const matchDates = Object.keys(S.days)
+      .filter(d => d < today)
+      .filter(d => {
+        const day = S.days[d];
+        return [1,2,3,4,5,6].some(m =>
+          (day.meals[m] || []).some(e => {
+            const f = S.foods.find(x => x.id === e.foodId);
+            return f && f.name.toLowerCase().includes(q);
+          })
+        );
+      })
+      .sort((a, b) => b.localeCompare(a));
+
+    const resultCards = matchDates.map(d => renderDayCard(d, q)).join('');
+    const countLabel  = matchDates.length
+      ? `<div style="font-size:12px;color:#666;margin-bottom:10px">${matchDates.length} jour${matchDates.length > 1 ? 's' : ''} trouvé${matchDates.length > 1 ? 's' : ''}</div>`
+      : `<p class="empty-state">Aucun jour trouvé avec "${escHtml(S.histSearch)}"</p>`;
+    return `
+    <div class="view-history">
+      <h2>Historique</h2>
+      <div class="hist-search-wrap">
+        <input class="search-input" type="search" placeholder="Rechercher un aliment…"
+          value="${escHtml(S.histSearch)}" data-action="searchHistory" autocomplete="off">
+      </div>
+      ${countLabel}
+      ${resultCards}
+    </div>`;
+  }
+
+  // ── Normal mode ──────────────────────────────────────────────
+  const pastDates = Object.keys(S.days)
+    .filter(d => d < today)
+    .sort((a, b) => b.localeCompare(a));
+
   const weekGroups = groupDaysByWeek(pastDates);
-  const html = weekGroups.map(wg => {
+  const currentWeekMonday = getISOWeek(today).monday;
+
+  let currentWeekHtml = '';
+  let pastWeeksHtml   = '';
+
+  for (const wg of weekGroups) {
+    const isCurrent  = wg.monday === currentWeekMonday;
+    const weekKey    = `${wg.year}-${String(wg.weekNum).padStart(2,'0')}`;
+    // Past weeks collapsed by default (unless user expanded them), current always open
+    const isCollapsed = !isCurrent && (S.collapsedWeeks[weekKey] !== false);
     const sortedDates = wg.dates.sort((a, b) => b.localeCompare(a));
-    const daySummary  = renderWeekSummary(sortedDates, wg.label);
-    const dayCards    = sortedDates.map(renderDayCard).join('');
-    return daySummary + dayCards;
-  }).join('');
+    const header      = renderWeekHeader(sortedDates, wg, isCurrent, isCollapsed);
+    const dayCards    = (isCurrent || !isCollapsed)
+      ? sortedDates.map(d => renderDayCard(d)).join('')
+      : '';
+
+    if (isCurrent) {
+      currentWeekHtml = `<div class="hist-section">${header}${dayCards}</div>`;
+    } else {
+      pastWeeksHtml += `<div class="hist-section hist-section-past">${header}${isCollapsed ? '' : dayCards}</div>`;
+    }
+  }
+
+  const separator = currentWeekHtml
+    ? `<div class="hist-separator"><span>Semaines passées</span></div>`
+    : '';
 
   return `
   <div class="view-history">
-    <h2>Historique</h2>
+    <div class="hist-top-bar">
+      <h2>Historique</h2>
+    </div>
+    <div class="hist-search-wrap">
+      <input class="search-input" type="search" placeholder="🔍 Rechercher un aliment…"
+        value="${escHtml(S.histSearch)}" data-action="searchHistory" autocomplete="off">
+    </div>
     ${tomorrowCard}
-    ${html}
+    <div class="hist-separator"><span>Semaine en cours</span></div>
+    ${currentWeekHtml || '<p class="empty-state" style="padding:12px 0">Aucune donnée cette semaine.</p>'}
+    ${separator}
+    ${pastWeeksHtml || ''}
   </div>`;
 }
 
@@ -1441,8 +1527,9 @@ function renderNav() {
         S.viewDate = todayStr();
       }
       if (S.tab !== 'history') {
-        S.histSub  = 'list';
-        S.editDate = null;
+        S.histSub    = 'list';
+        S.editDate   = null;
+        S.histSearch = '';
       }
       
       render();
@@ -1481,6 +1568,18 @@ function handleClick(e) {
   const a = el.dataset.action;
 
   switch (a) {
+
+    case 'toggleWeek': {
+      const key = el.dataset.key;
+      // false = explicitly expanded, delete key = back to default (collapsed)
+      if (S.collapsedWeeks[key] === false) {
+        delete S.collapsedWeeks[key]; // collapse it (back to default)
+      } else {
+        S.collapsedWeeks[key] = false; // expand it
+      }
+      render();
+      break;
+    }
 
     // ── Navigation within views
     case 'back':
@@ -2280,6 +2379,17 @@ function handleInput(e) {
     };
     reader.readAsText(file);
     el.value = ''; // reset so same file can be picked again
+    return;
+  }
+
+  if (a === 'searchHistory') {
+    S.histSearch = el.value;
+    render(); // full re-render to filter
+    // Keep focus after render
+    setTimeout(() => {
+      const inp = document.querySelector('[data-action="searchHistory"]');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }, 10);
     return;
   }
 

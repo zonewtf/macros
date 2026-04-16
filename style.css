@@ -1018,3 +1018,67 @@ h2 {
   color: var(--text2);
 }
 .week-badges { font-size: 12px; color: var(--text3); }
+
+/* ─── History restructure ────────────────────────────────────── */
+.hist-top-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.hist-top-bar h2 { margin:0; }
+.hist-search-wrap { margin-bottom:12px; }
+.hist-search-wrap .search-input { margin-bottom:0; }
+
+.hist-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 10px;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hist-separator::before, .hist-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+}
+
+.hist-section { margin-bottom: 4px; }
+.hist-section-past { margin-bottom: 2px; }
+
+/* Week header block */
+.week-header-block {
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 8px;
+}
+.week-current {
+  border-color: rgba(126,184,247,0.2);
+  background: rgba(126,184,247,0.04);
+}
+.week-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.week-header-left { flex: 1; min-width: 0; }
+.week-label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 2px; }
+.week-badges { font-size: 11px; color: var(--text3); }
+.week-collapse-btn {
+  font-size: 14px;
+  color: var(--text3);
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.week-collapse-btn:active { color: var(--text); }
+
+/* Search match highlight */
+.hist-card-search-match {
+  border-color: rgba(126,184,247,0.25);
+  background: rgba(126,184,247,0.04);
+}
