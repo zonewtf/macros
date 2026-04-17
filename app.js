@@ -265,7 +265,7 @@ function renderDayView(date) {
          <h2>${fmtDate(date)}</h2>
          <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
        </div>
-       ${(() => { const s = getStreak(); return s >= 1 ? `<div class="streak-row">${'🔥'.repeat(Math.min(s,7))} <span class="streak-count">${s} jour${s>1?'s':''} d'affilée</span></div>` : ''; })()}`
+       ${(() => { const s = getStreak(); return s >= 1 ? `<div class="streak-row">🔥 <span class="streak-count">${s} jour${s>1?'s':''} d'affilée</span></div>` : ''; })()}`
     : `<div class="day-header">
          <button class="btn-back" data-action="back">← Retour</button>
          <button class="btn-toggle" data-action="toggleType" data-date="${date}">${badge}</button>
@@ -316,18 +316,23 @@ function renderDayView(date) {
         ? `${+(e.grams / f.unitWeight).toFixed(1)} u.`
         : `${e.grams}g`;
       const mc = calcMacros([e]);
-      return `<div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
-        <div class="entry-left">
-          <span class="entry-name">${escHtml(f.name)}</span>
-          <div class="entry-macros-row">
-            <span class="entry-macro-p">P ${mc.p}g</span>
-            <span class="entry-macro-g">G ${mc.g}g</span>
-            <span class="entry-macro-l">L ${mc.l}g</span>
-          </div>
+      return `<div class="meal-entry-wrap" data-meal="${m}" data-idx="${i}" data-date="${date}">
+        <div class="meal-entry-delete-bg">
+          <button class="meal-entry-delete-btn" data-action="swipeDeleteEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">🗑 Supprimer</button>
         </div>
-        <div class="entry-right">
-          <span class="entry-qty">${qty}</span>
-          <span class="entry-kcal">${mc.kcal} kcal</span>
+        <div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
+          <div class="entry-left">
+            <span class="entry-name">${escHtml(f.name)}</span>
+            <div class="entry-macros-row">
+              <span class="entry-macro-p">P ${mc.p}g</span>
+              <span class="entry-macro-g">G ${mc.g}g</span>
+              <span class="entry-macro-l">L ${mc.l}g</span>
+            </div>
+          </div>
+          <div class="entry-right">
+            <span class="entry-qty">${qty}</span>
+            <span class="entry-kcal">${mc.kcal} kcal</span>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -1560,6 +1565,40 @@ function bindEvents() {
   const app = document.getElementById('app');
   app.addEventListener('click', handleClick);
   app.addEventListener('input', handleInput);
+
+  // ── Swipe-to-delete on meal entries ──────────────────────────
+  let _startX = null, _swipeInner = null;
+
+  app.addEventListener('touchstart', e => {
+    const wrap = e.target.closest('.meal-entry-wrap');
+    if (!wrap) return;
+    _swipeInner = wrap.querySelector('.meal-entry');
+    _startX     = e.touches[0].clientX;
+    if (_swipeInner) _swipeInner.style.transition = 'none';
+  }, { passive: true });
+
+  app.addEventListener('touchmove', e => {
+    if (_startX === null || !_swipeInner) return;
+    const dx = e.touches[0].clientX - _startX;
+    if (dx > 0) return; // left swipe only
+    _swipeInner.style.transform = `translateX(${Math.max(dx, -110)}px)`;
+  }, { passive: true });
+
+  app.addEventListener('touchend', e => {
+    if (_startX === null || !_swipeInner) return;
+    const dx = e.changedTouches[0].clientX - _startX;
+    _swipeInner.style.transition = 'transform 0.2s ease';
+    _swipeInner.style.transform  = dx < -70 ? 'translateX(-90px)' : 'translateX(0)';
+    _startX = null; _swipeInner = null;
+  }, { passive: true });
+
+  // Tap elsewhere → snap all entries back
+  app.addEventListener('click', () => {
+    app.querySelectorAll('.meal-entry').forEach(el => {
+      el.style.transition = 'transform 0.2s ease';
+      el.style.transform  = 'translateX(0)';
+    });
+  });
 }
 
 function handleClick(e) {
@@ -1576,6 +1615,17 @@ function handleClick(e) {
         delete S.collapsedWeeks[key]; // collapse it (back to default)
       } else {
         S.collapsedWeeks[key] = false; // expand it
+      }
+      render();
+      break;
+    }
+
+    case 'swipeDeleteEntry': {
+      const { meal, idx, date } = el.dataset;
+      const day = S.days[date];
+      if (day?.meals[meal]) {
+        day.meals[meal].splice(+idx, 1);
+        save();
       }
       render();
       break;

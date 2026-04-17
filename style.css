@@ -1082,3 +1082,39 @@ h2 {
   border-color: rgba(126,184,247,0.25);
   background: rgba(126,184,247,0.04);
 }
+
+/* ─── Swipe to delete ────────────────────────────────────────── */
+.meal-entry-wrap {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+}
+/* Remove double border on first child */
+.meal-section > .meal-entry-wrap:first-of-type { border-top: none; }
+.meal-entry-delete-bg {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 90px;
+  background: rgba(232,112,112,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.meal-entry-delete-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e87070;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: none;
+  white-space: nowrap;
+}
+.meal-entry-delete-btn:active { background: rgba(232,112,112,0.2); }
+/* The sliding row itself */
+.meal-entry {
+  position: relative;
+  background: var(--card);
+  border-top: none; /* border handled by wrap */
+  transform: translateX(0);
+  will-change: transform;
+}
