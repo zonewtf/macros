@@ -219,16 +219,6 @@ function renderBar(label, consumed, goal, color) {
   </div>`;
 }
 
-function renderPill(label, val, goal, color, unit = 'g') {
-  const rem  = goal - val;
-  const over = rem < 0;
-  const sign = over ? '+' : (rem === 0 ? '' : '-');
-  const abs  = Math.abs(Math.round(rem));
-  const display = over ? `+${abs}${unit}` : `-${abs}${unit}`;
-  const c    = over ? color : color; // keep same color regardless
-  return `<span class="pill" style="--c:${color}">${label ? label + ' ' : ''}${display}</span>`;
-}
-
 // Pills delta pour aujourd'hui : couleur fixe, signe +/- selon dépassement ou manque
 function renderPillDelta(val, goal, color, prefix, unit) {
   const diff = val - goal;          // positive = dépassé, negative = manque
@@ -1591,17 +1581,6 @@ function handleClick(e) {
         delete S.collapsedWeeks[key]; // collapse it (back to default)
       } else {
         S.collapsedWeeks[key] = false; // expand it
-      }
-      render();
-      break;
-    }
-
-    case 'swipeDeleteEntry': {
-      const { meal, idx, date } = el.dataset;
-      const day = S.days[date];
-      if (day?.meals[meal]) {
-        day.meals[meal].splice(+idx, 1);
-        save();
       }
       render();
       break;

@@ -131,16 +131,6 @@ h2 {
 }
 
 /* ─── Over Alert ─────────────────────────────────────────────── */
-.over-alert {
-  background: rgba(232,112,112,0.12);
-  border: 1px solid rgba(232,112,112,0.3);
-  color: var(--danger);
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
 
 /* ─── Summary Card ───────────────────────────────────────────── */
 .summary-card {
@@ -229,7 +219,7 @@ h2 {
   gap: 8px;
 }
 .meal-title { font-size: 14px; font-weight: 600; color: var(--text2); }
-.meal-kcal { flex: 1; font-size: 13px; color: var(--text3); }
+
 .btn-add-meal {
   font-size: 13px;
   color: var(--accent);
@@ -1079,40 +1069,4 @@ h2 {
 .hist-card-search-match {
   border-color: rgba(126,184,247,0.25);
   background: rgba(126,184,247,0.04);
-}
-
-/* ─── Swipe to delete ────────────────────────────────────────── */
-.meal-entry-wrap {
-  position: relative;
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-}
-/* Remove double border on first child */
-.meal-section > .meal-entry-wrap:first-of-type { border-top: none; }
-.meal-entry-delete-bg {
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 90px;
-  background: rgba(232,112,112,0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.meal-entry-delete-btn {
-  font-size: 12px;
-  font-weight: 600;
-  color: #e87070;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: none;
-  white-space: nowrap;
-}
-.meal-entry-delete-btn:active { background: rgba(232,112,112,0.2); }
-/* The sliding row itself */
-.meal-entry {
-  position: relative;
-  background: var(--card);
-  border-top: none; /* border handled by wrap */
-  transform: translateX(0);
-  will-change: transform;
 }
