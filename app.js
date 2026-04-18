@@ -738,6 +738,7 @@ function renderFoodsAliments() {
     <div class="foods-header">
       <h2>Aliments</h2>
       <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-select-mode" data-action="scanBarcodeFromFoods" title="Scanner un code-barres">📷</button>
         <button class="btn-select-mode ${selMode ? 'btn-select-mode-active' : ''}" data-action="toggleSelectMode" title="Sélection multiple">☑</button>
         <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
       </div>
@@ -2039,7 +2040,8 @@ function handleClick(e) {
     case 'exportJSON': exportFullJSON();   break;
 
     // ── Barcode
-    case 'scanBarcode': scanBarcode(); break;
+    case 'scanBarcode':          scanBarcode();            break;
+    case 'scanBarcodeFromFoods': scanBarcode('foods');     break;
 
     // ── #3 — Créatine
     case 'takeCreatine': {
@@ -2768,7 +2770,7 @@ function download(filename, content, mime) {
 
 // ── Barcode Scanner ───────────────────────────────────────────
 
-async function scanBarcode() {
+async function scanBarcode(context = 'meal') {
   if (!('BarcodeDetector' in window)) {
     showToast('Scanner non disponible — entre le code manuellement.');
     return;
@@ -2801,7 +2803,7 @@ async function scanBarcode() {
         const barcodes = await detector.detect(vid);
         if (barcodes.length > 0) {
           stopScan();
-          await fetchOpenFoodFacts(barcodes[0].rawValue);
+          await fetchOpenFoodFacts(barcodes[0].rawValue, context);
         }
       } catch (_) { /* continue scanning */ }
     }, 500);
@@ -2811,13 +2813,20 @@ async function scanBarcode() {
   }
 }
 
-async function fetchOpenFoodFacts(barcode) {
+async function fetchOpenFoodFacts(barcode, context = 'meal') {
   showToast('Recherche du produit…');
   try {
     const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
     const data = await res.json();
     if (data.status !== 1) {
-      showToast('Produit non trouvé. Saisis les infos manuellement.');
+      showToast('Produit non trouvé sur OpenFoodFacts. Saisis les infos manuellement.');
+      // Still open addFoodDB modal so user can add manually
+      if (context === 'foods') {
+        S.tab   = 'foods';
+        S.modal = 'addFoodDB';
+        S.md    = {};
+        render();
+      }
       return;
     }
     const prod = data.product;
@@ -2827,18 +2836,34 @@ async function fetchOpenFoodFacts(barcode) {
       (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0)
     );
     const { meal, date } = S.md;
-    S.modal = 'addFoodDB';
-    S.md    = {
-      name:        prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
-      kcal,
-      p:           +(n['proteins_100g']       || 0).toFixed(1),
-      g:           +(n['carbohydrates_100g']  || 0).toFixed(1),
-      l:           +(n['fat_100g']            || 0).toFixed(1),
-      pendingMeal: meal,
-      pendingDate: date
-    };
+
+    if (context === 'foods') {
+      // Coming from Aliments tab — just open addFoodDB pre-filled, no pending meal
+      S.tab   = 'foods';
+      S.modal = 'addFoodDB';
+      S.md    = {
+        name:  prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
+        brand: prod.brands || '',
+        kcal,
+        p:     +(n['proteins_100g']      || 0).toFixed(1),
+        g:     +(n['carbohydrates_100g'] || 0).toFixed(1),
+        l:     +(n['fat_100g']           || 0).toFixed(1),
+      };
+    } else {
+      // Coming from meal add modal — keep pending meal context
+      S.modal = 'addFoodDB';
+      S.md    = {
+        name:        prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
+        kcal,
+        p:           +(n['proteins_100g']       || 0).toFixed(1),
+        g:           +(n['carbohydrates_100g']  || 0).toFixed(1),
+        l:           +(n['fat_100g']            || 0).toFixed(1),
+        pendingMeal: meal,
+        pendingDate: date
+      };
+    }
     render();
-    showToast('Produit trouvé ! Vérifie les infos.');
+    showToast('✅ Produit trouvé ! Vérifie et enregistre.');
   } catch (err) {
     showToast('Erreur réseau : ' + err.message);
   }
