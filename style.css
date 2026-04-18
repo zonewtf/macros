@@ -980,7 +980,6 @@ h2 {
   text-align: center;
 }
 
-/* ─── History burned / deficit ───────────────────────────────── */
 .btn-add-burned {
   font-size: 11px;
   padding: 2px 7px;
@@ -991,15 +990,14 @@ h2 {
   flex-shrink: 0;
 }
 .btn-add-burned:active { background: rgba(240,192,64,0.16); }
-.hist-deficit {
+
+/* ─── History burned / deficit (neutral, no judgment) ───────── */
+.hist-deficit-neutral {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   margin-top: 6px;
-  padding: 5px 8px;
-  border-radius: 8px;
+  color: #888;
 }
-.deficit-ok  { color: #66ffaa; background: rgba(102,255,170,0.07); }
-.deficit-over { color: #e87070; background: rgba(232,112,112,0.08); }
 
 /* ─── Weekly summary card ────────────────────────────────────── */
 .week-summary-card {

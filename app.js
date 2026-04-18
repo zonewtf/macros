@@ -316,23 +316,18 @@ function renderDayView(date) {
         ? `${+(e.grams / f.unitWeight).toFixed(1)} u.`
         : `${e.grams}g`;
       const mc = calcMacros([e]);
-      return `<div class="meal-entry-wrap" data-meal="${m}" data-idx="${i}" data-date="${date}">
-        <div class="meal-entry-delete-bg">
-          <button class="meal-entry-delete-btn" data-action="swipeDeleteEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">🗑 Supprimer</button>
+      return `<div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
+        <div class="entry-left">
+          <span class="entry-name">${escHtml(f.name)}</span>
+          <div class="entry-macros-row">
+            <span class="entry-macro-p">P ${mc.p}g</span>
+            <span class="entry-macro-g">G ${mc.g}g</span>
+            <span class="entry-macro-l">L ${mc.l}g</span>
+          </div>
         </div>
-        <div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
-          <div class="entry-left">
-            <span class="entry-name">${escHtml(f.name)}</span>
-            <div class="entry-macros-row">
-              <span class="entry-macro-p">P ${mc.p}g</span>
-              <span class="entry-macro-g">G ${mc.g}g</span>
-              <span class="entry-macro-l">L ${mc.l}g</span>
-            </div>
-          </div>
-          <div class="entry-right">
-            <span class="entry-qty">${qty}</span>
-            <span class="entry-kcal">${mc.kcal} kcal</span>
-          </div>
+        <div class="entry-right">
+          <span class="entry-qty">${qty}</span>
+          <span class="entry-kcal">${mc.kcal} kcal</span>
         </div>
       </div>`;
     }).join('');
@@ -481,8 +476,8 @@ function renderHistory() {
       ? `<button class="btn-add-burned" data-action="openBurnedInput" data-date="${d}">⌚ +Watch</button>`
       : `<span class="pill-sm" style="color:#f0c040">⌚ ${burned} kcal</span>`;
     const deficitLine = burned
-      ? `<div class="hist-deficit ${deficit > 0 ? 'deficit-ok' : 'deficit-over'}">
-           ${deficit > 0 ? `✅ Déficit : −${deficit} kcal` : `⚠️ Surplus : +${Math.abs(deficit)} kcal`}
+      ? `<div class="hist-deficit-neutral">
+           ${deficit > 0 ? `Déficit : −${deficit} kcal` : `Surplus : +${Math.abs(deficit)} kcal`}
          </div>`
       : '';
 
@@ -549,10 +544,24 @@ function renderHistory() {
     const avgB = bCount > 0 ? Math.round(sumB / bCount) : null;
     const def  = avgB ? avgB - avgK : null;
     const defLine = def !== null
-      ? `<div style="font-size:12px;margin-top:5px;color:${def > 0 ? '#66ffaa' : '#e87070'}">
+      ? `<div style="font-size:12px;margin-top:5px;color:#888">
            ${def > 0 ? `Déficit moy. −${def} kcal/j` : `Surplus moy. +${Math.abs(def)} kcal/j`}
          </div>`
       : '';
+
+    // #2 — Weekly calorie balance + theoretical fat
+    const weeklyBalanceLine = (() => {
+      if (!avgB || n < 1) return '';
+      const totalIngested = Math.round(sumK);
+      const totalBurned   = Math.round(sumB);
+      const totalBalance  = totalBurned - totalIngested; // positive = deficit
+      const fatGrams      = Math.round(Math.abs(totalBalance) / 7.7); // ~7700 kcal/kg fat → 7.7 kcal/g
+      const sign          = totalBalance >= 0 ? '−' : '+';
+      const label         = totalBalance >= 0 ? 'Déficit' : 'Surplus';
+      return `<div style="font-size:12px;margin-top:4px;color:#666">
+        ${label} semaine : ${sign}${Math.abs(totalBalance)} kcal · ≈ ${sign}${fatGrams}g de gras théorique
+      </div>`;
+    })();
     const weekKey = `${wg.year}-${String(wg.weekNum).padStart(2,'0')}`;
     const toggleBtn = !isCurrent
       ? `<button class="week-collapse-btn" data-action="toggleWeek" data-key="${weekKey}">${isCollapsed ? '▸' : '▾'}</button>`
@@ -575,6 +584,7 @@ function renderHistory() {
         ${avgB ? `<span class="pill-sm" style="color:#f0c040">⌚ ${avgB}</span>` : ''}
       </div>
       ${defLine}
+      ${weeklyBalanceLine}
     </div>`;
   };
 
@@ -1565,40 +1575,6 @@ function bindEvents() {
   const app = document.getElementById('app');
   app.addEventListener('click', handleClick);
   app.addEventListener('input', handleInput);
-
-  // ── Swipe-to-delete on meal entries ──────────────────────────
-  let _startX = null, _swipeInner = null;
-
-  app.addEventListener('touchstart', e => {
-    const wrap = e.target.closest('.meal-entry-wrap');
-    if (!wrap) return;
-    _swipeInner = wrap.querySelector('.meal-entry');
-    _startX     = e.touches[0].clientX;
-    if (_swipeInner) _swipeInner.style.transition = 'none';
-  }, { passive: true });
-
-  app.addEventListener('touchmove', e => {
-    if (_startX === null || !_swipeInner) return;
-    const dx = e.touches[0].clientX - _startX;
-    if (dx > 0) return; // left swipe only
-    _swipeInner.style.transform = `translateX(${Math.max(dx, -110)}px)`;
-  }, { passive: true });
-
-  app.addEventListener('touchend', e => {
-    if (_startX === null || !_swipeInner) return;
-    const dx = e.changedTouches[0].clientX - _startX;
-    _swipeInner.style.transition = 'transform 0.2s ease';
-    _swipeInner.style.transform  = dx < -70 ? 'translateX(-90px)' : 'translateX(0)';
-    _startX = null; _swipeInner = null;
-  }, { passive: true });
-
-  // Tap elsewhere → snap all entries back
-  app.addEventListener('click', () => {
-    app.querySelectorAll('.meal-entry').forEach(el => {
-      el.style.transition = 'transform 0.2s ease';
-      el.style.transform  = 'translateX(0)';
-    });
-  });
 }
 
 function handleClick(e) {
