@@ -738,7 +738,6 @@ function renderFoodsAliments() {
     <div class="foods-header">
       <h2>Aliments</h2>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn-select-mode" data-action="scanBarcodeFromFoods" title="Scanner un code-barres">📷</button>
         <button class="btn-select-mode ${selMode ? 'btn-select-mode-active' : ''}" data-action="toggleSelectMode" title="Sélection multiple">☑</button>
         <button class="btn-primary-sm" data-action="openAddFoodDB">+ Nouveau</button>
       </div>
@@ -1144,28 +1143,62 @@ function renderAddFoodDBModal() {
     <input type="text" class="form-input" id="db-name"
       value="${escHtml(d.name || '')}" placeholder="ex : Poulet grillé" autocomplete="off">
   </div>
+
+  <div class="calc-toggle-wrap">
+    <span class="calc-toggle-label">Valeurs indiquées pour</span>
+    <div class="calc-toggle-btns">
+      <button class="calc-btn ${!d.calcMode ? 'active' : ''}" data-action="setCalcMode" data-val="100">100g</button>
+      <button class="calc-btn ${d.calcMode ? 'active' : ''}" data-action="setCalcMode" data-val="custom">Autre quantité</button>
+    </div>
+  </div>
+
+  ${d.calcMode ? `
   <div class="form-group">
-    <label>Calories (kcal pour 100g)</label>
+    <label>Quantité de référence sur le paquet (g)</label>
+    <input type="number" class="form-input" id="db-ref-qty"
+      value="${d.refQty || ''}" placeholder="ex : 70" inputmode="decimal"
+      data-action="recalcPer100g">
+  </div>
+  <p style="font-size:12px;color:#666;margin:-8px 0 12px">Saisis les valeurs pour ${d.refQty || 'X'}g ci-dessous → l'app les convertira pour 100g</p>
+  ` : ''}
+
+  <div class="form-group">
+    <label>Calories (kcal ${d.calcMode ? `pour ${d.refQty || '…'}g` : 'pour 100g'})</label>
     <input type="number" class="form-input" id="db-kcal"
-      value="${d.kcal || ''}" placeholder="165" inputmode="decimal">
+      value="${d.kcal || ''}" placeholder="165" inputmode="decimal"
+      ${d.calcMode ? 'data-action="recalcPer100g"' : ''}>
   </div>
   <div class="form-row-3">
     <div class="form-group">
       <label>Protéines (g)</label>
       <input type="number" class="form-input" id="db-p"
-        value="${d.p || ''}" placeholder="31" inputmode="decimal">
+        value="${d.p || ''}" placeholder="31" inputmode="decimal"
+        ${d.calcMode ? 'data-action="recalcPer100g"' : ''}>
     </div>
     <div class="form-group">
       <label>Glucides (g)</label>
       <input type="number" class="form-input" id="db-g"
-        value="${d.g || ''}" placeholder="0" inputmode="decimal">
+        value="${d.g || ''}" placeholder="0" inputmode="decimal"
+        ${d.calcMode ? 'data-action="recalcPer100g"' : ''}>
     </div>
     <div class="form-group">
       <label>Lipides (g)</label>
       <input type="number" class="form-input" id="db-l"
-        value="${d.l || ''}" placeholder="3.6" inputmode="decimal">
+        value="${d.l || ''}" placeholder="3.6" inputmode="decimal"
+        ${d.calcMode ? 'data-action="recalcPer100g"' : ''}>
     </div>
   </div>
+
+  ${d.calcMode && d.refQty && (d.kcal || d.p || d.g || d.l) ? `
+  <div class="calc-preview">
+    <span style="font-size:12px;color:#7eb8f7;font-weight:600">= Pour 100g :</span>
+    <span>${d.kcal ? Math.round(d.kcal * 100 / d.refQty) + ' kcal' : ''}</span>
+    ${d.p ? `<span style="color:#7eb8f7">P ${+(d.p * 100 / d.refQty).toFixed(1)}g</span>` : ''}
+    ${d.g ? `<span style="color:#f0c040">G ${+(d.g * 100 / d.refQty).toFixed(1)}g</span>` : ''}
+    ${d.l ? `<span style="color:#e87070">L ${+(d.l * 100 / d.refQty).toFixed(1)}g</span>` : ''}
+  </div>
+  ` : ''}
+
   <div class="form-group" style="margin-top:4px">
     <label>Poids unitaire (g/unité) — optionnel</label>
     <input type="number" class="form-input" id="db-unit"
@@ -1792,9 +1825,16 @@ function handleClick(e) {
     // ── Modal: Add food to database
     case 'openAddFoodDB':
       S.modal = 'addFoodDB';
-      S.md    = {};
+      S.md    = { calcMode: false };
       render();
       setTimeout(() => document.getElementById('db-name')?.focus(), 80);
+      break;
+
+    case 'setCalcMode':
+      S.md.calcMode = el.dataset.val === 'custom';
+      S.md.refQty   = null;
+      render();
+      setTimeout(() => document.getElementById(S.md.calcMode ? 'db-ref-qty' : 'db-kcal')?.focus(), 80);
       break;
 
     case 'addFoodToDBFromSearch': {
@@ -1807,15 +1847,23 @@ function handleClick(e) {
     }
 
     case 'saveFoodDB': {
-      const brand = document.getElementById('db-brand')?.value.trim() || '';
-      const nom   = document.getElementById('db-name')?.value.trim()  || '';
-      const kcal  = +document.getElementById('db-kcal')?.value;
-      const p     = +document.getElementById('db-p')?.value    || 0;
-      const g     = +document.getElementById('db-g')?.value    || 0;
-      const l     = +document.getElementById('db-l')?.value    || 0;
-      const uw    = +document.getElementById('db-unit')?.value || null;
+      const brand   = document.getElementById('db-brand')?.value.trim() || '';
+      const nom     = document.getElementById('db-name')?.value.trim()  || '';
+      let   kcal    = +document.getElementById('db-kcal')?.value;
+      let   p       = +document.getElementById('db-p')?.value    || 0;
+      let   g       = +document.getElementById('db-g')?.value    || 0;
+      let   l       = +document.getElementById('db-l')?.value    || 0;
+      const uw      = +document.getElementById('db-unit')?.value || null;
       if (!nom)  { showToast('Donne un nom à l\'aliment.'); break; }
       if (!kcal) { showToast('Les calories sont requises.'); break; }
+      // If custom qty mode, convert proportionally to per 100g
+      if (S.md.calcMode && S.md.refQty && S.md.refQty !== 100) {
+        const r = 100 / S.md.refQty;
+        kcal = Math.round(kcal * r);
+        p    = +(p * r).toFixed(1);
+        g    = +(g * r).toFixed(1);
+        l    = +(l * r).toFixed(1);
+      }
       const fullName = brand ? `${brand} — ${nom}` : nom;
       const food = { id: uid(), name: fullName, kcal, p, g, l, unitWeight: uw || null };
       S.foods.push(food);
@@ -2038,10 +2086,6 @@ function handleClick(e) {
     // legacy compat
     case 'exportCSV':  exportHistoryCSV(); break;
     case 'exportJSON': exportFullJSON();   break;
-
-    // ── Barcode
-    case 'scanBarcode':          scanBarcode();            break;
-    case 'scanBarcodeFromFoods': scanBarcode('foods');     break;
 
     // ── #3 — Créatine
     case 'takeCreatine': {
@@ -2397,6 +2441,52 @@ function handleInput(e) {
       const inp = document.querySelector('[data-action="searchHistory"]');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     }, 10);
+    return;
+  }
+
+  if (a === 'recalcPer100g') {
+    // Sync md with current field values and re-render preview
+    const refQty = +document.getElementById('db-ref-qty')?.value || S.md.refQty;
+    S.md.refQty = refQty || null;
+    S.md.kcal   = +document.getElementById('db-kcal')?.value || null;
+    S.md.p      = +document.getElementById('db-p')?.value    || null;
+    S.md.g      = +document.getElementById('db-g')?.value    || null;
+    S.md.l      = +document.getElementById('db-l')?.value    || null;
+    // Only re-render the preview block, not the whole modal (to keep keyboard open)
+    const preview = document.querySelector('.calc-preview');
+    const refLabel = document.querySelector('#db-ref-qty');
+    // Update labels
+    document.querySelectorAll('[id^="db-kcal"], [id^="db-p"], [id^="db-g"], [id^="db-l"]').forEach(inp => {
+      const label = inp.closest('.form-group')?.querySelector('label');
+      if (label && S.md.calcMode) {
+        const base = inp.id === 'db-kcal' ? 'Calories (kcal' : inp.id === 'db-p' ? 'Protéines (g' : inp.id === 'db-g' ? 'Glucides (g' : 'Lipides (g';
+        label.textContent = `${base} pour ${S.md.refQty || '…'}g)`;
+      }
+    });
+    // Rebuild preview inline without full render
+    if (S.md.refQty && (S.md.kcal || S.md.p || S.md.g || S.md.l)) {
+      const r = 100 / S.md.refQty;
+      const html = `
+        <span style="font-size:12px;color:#7eb8f7;font-weight:600">= Pour 100g :</span>
+        <span>${S.md.kcal ? Math.round(S.md.kcal * r) + ' kcal' : ''}</span>
+        ${S.md.p ? `<span style="color:#7eb8f7">P ${+(S.md.p * r).toFixed(1)}g</span>` : ''}
+        ${S.md.g ? `<span style="color:#f0c040">G ${+(S.md.g * r).toFixed(1)}g</span>` : ''}
+        ${S.md.l ? `<span style="color:#e87070">L ${+(S.md.l * r).toFixed(1)}g</span>` : ''}`;
+      if (preview) {
+        preview.innerHTML = html;
+      } else {
+        // Insert preview before unit field
+        const unitGroup = document.querySelector('#db-unit')?.closest('.form-group');
+        if (unitGroup) {
+          const div = document.createElement('div');
+          div.className = 'calc-preview';
+          div.innerHTML = html;
+          unitGroup.before(div);
+        }
+      }
+    } else if (preview) {
+      preview.innerHTML = '';
+    }
     return;
   }
 
@@ -2769,105 +2859,6 @@ function download(filename, content, mime) {
 }
 
 // ── Barcode Scanner ───────────────────────────────────────────
-
-async function scanBarcode(context = 'meal') {
-  if (!('BarcodeDetector' in window)) {
-    showToast('Scanner non disponible — entre le code manuellement.');
-    return;
-  }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-    const overlay = document.createElement('div');
-    overlay.className = 'scanner-overlay';
-    overlay.innerHTML = `
-      <video id="scan-video" autoplay playsinline muted></video>
-      <p>Pointe vers le code-barres…</p>
-      <button id="scan-cancel">Annuler</button>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector('#scan-video').srcObject = stream;
-
-    const stopScan = () => {
-      clearInterval(timer);
-      stream.getTracks().forEach(t => t.stop());
-      overlay.remove();
-    };
-    overlay.querySelector('#scan-cancel').onclick = stopScan;
-
-    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
-    const timer    = setInterval(async () => {
-      const vid = overlay.querySelector('#scan-video');
-      if (!vid || !vid.readyState >= 2) return;
-      try {
-        const barcodes = await detector.detect(vid);
-        if (barcodes.length > 0) {
-          stopScan();
-          await fetchOpenFoodFacts(barcodes[0].rawValue, context);
-        }
-      } catch (_) { /* continue scanning */ }
-    }, 500);
-
-  } catch (err) {
-    showToast('Caméra non accessible : ' + err.message);
-  }
-}
-
-async function fetchOpenFoodFacts(barcode, context = 'meal') {
-  showToast('Recherche du produit…');
-  try {
-    const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-    const data = await res.json();
-    if (data.status !== 1) {
-      showToast('Produit non trouvé sur OpenFoodFacts. Saisis les infos manuellement.');
-      // Still open addFoodDB modal so user can add manually
-      if (context === 'foods') {
-        S.tab   = 'foods';
-        S.modal = 'addFoodDB';
-        S.md    = {};
-        render();
-      }
-      return;
-    }
-    const prod = data.product;
-    const n    = prod.nutriments;
-    const kcal = Math.round(
-      n['energy-kcal_100g'] ||
-      (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0)
-    );
-    const { meal, date } = S.md;
-
-    if (context === 'foods') {
-      // Coming from Aliments tab — just open addFoodDB pre-filled, no pending meal
-      S.tab   = 'foods';
-      S.modal = 'addFoodDB';
-      S.md    = {
-        name:  prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
-        brand: prod.brands || '',
-        kcal,
-        p:     +(n['proteins_100g']      || 0).toFixed(1),
-        g:     +(n['carbohydrates_100g'] || 0).toFixed(1),
-        l:     +(n['fat_100g']           || 0).toFixed(1),
-      };
-    } else {
-      // Coming from meal add modal — keep pending meal context
-      S.modal = 'addFoodDB';
-      S.md    = {
-        name:        prod.product_name_fr || prod.product_name || `Produit ${barcode}`,
-        kcal,
-        p:           +(n['proteins_100g']       || 0).toFixed(1),
-        g:           +(n['carbohydrates_100g']  || 0).toFixed(1),
-        l:           +(n['fat_100g']            || 0).toFixed(1),
-        pendingMeal: meal,
-        pendingDate: date
-      };
-    }
-    render();
-    showToast('✅ Produit trouvé ! Vérifie et enregistre.');
-  } catch (err) {
-    showToast('Erreur réseau : ' + err.message);
-  }
-}
 
 // ── Toast ─────────────────────────────────────────────────────
 
