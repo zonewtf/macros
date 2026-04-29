@@ -78,7 +78,7 @@ function fmtDateShort(ds) {
 
 function getDay(date) {
   if (!S.days[date]) {
-    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null, burned: null };
+    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null, burned: null, estimated: null };
     save();
   }
   // Ensure all 6 meals exist (migration safety)
@@ -90,6 +90,19 @@ function getDay(date) {
 
 function allEntries(day) {
   return [1, 2, 3, 4, 5, 6].flatMap(m => day.meals[m] || []);
+}
+
+// Returns real macros if food logged, else estimation if set, else zeros
+function getEffectiveTotals(day) {
+  const entries = allEntries(day);
+  if (entries.length > 0) return calcMacros(entries);
+  if (day.estimated) return { ...day.estimated };
+  return { kcal: 0, p: 0, g: 0, l: 0 };
+}
+
+// A day is "empty" if no food AND no estimation
+function isDayEmpty(day) {
+  return allEntries(day).length === 0 && !day.estimated;
 }
 
 function calcMacros(entries) {
@@ -244,7 +257,10 @@ function renderDayView(date) {
   const isTomorrow = date === tomorrowStr();
   const day        = getDay(date);
   const goals      = S.goals[day.type];
-  const totals     = calcMacros(allEntries(day));
+  const realEntries = allEntries(day);
+  const hasRealFood = realEntries.length > 0;
+  const totals      = getEffectiveTotals(day);
+  const isEstimated = !hasRealFood && !!day.estimated;
 
   const badge = day.type === 'sport'
     ? `<span class="badge-sport">Sport ⚡</span>`
@@ -262,7 +278,7 @@ function renderDayView(date) {
        </div>
        <h2 class="day-title">${isTomorrow ? 'Demain — ' : ''}${fmtDate(date)}</h2>`;
 
-  // Créatine + calories Watch — côte à côte
+  // Créatine + Watch
   const creatineBtn = (() => {
     const taken  = day.creatine;
     const burned = day.burned;
@@ -275,8 +291,16 @@ function renderDayView(date) {
     return `<div class="action-row">${creatinePart}${burnedPart}</div>`;
   })();
 
+  // Estimation badge + edit button
+  const estimateBadge = isEstimated
+    ? `<div class="estimate-banner">
+         <span>~ Journée estimée</span>
+         <button class="btn-estimate-edit" data-action="openDayEstimate" data-date="${date}">Modifier</button>
+       </div>`
+    : '';
+
   const summary = `
-  <div class="summary-card">
+  <div class="summary-card ${isEstimated ? 'summary-estimated' : ''}">
     ${renderRing(totals.kcal, goals.kcal)}
     <div class="macros-detail">
       ${renderBar('Protéines', totals.p, goals.p, '#7eb8f7')}
@@ -290,6 +314,13 @@ function renderDayView(date) {
       </div>
     </div>
   </div>`;
+
+  // Estimate button — only when 0 real food AND no estimation yet
+  const estimateBtn = (!hasRealFood && !day.estimated)
+    ? `<button class="btn-estimate" data-action="openDayEstimate" data-date="${date}">
+         ~ Estimer ma journée
+       </button>`
+    : '';
 
   let mealsHtml = '<div class="meals">';
   for (let m = 1; m <= 6; m++) {
@@ -322,7 +353,6 @@ function renderDayView(date) {
       </div>`;
     }).join('');
 
-    // #3 — P/G/L sub-line in meal header
     const mealMacroSub = hasFood
       ? `<div class="meal-macro-sub">
            <span style="color:#7eb8f7">P ${mTotals.p}g</span>
@@ -352,14 +382,15 @@ function renderDayView(date) {
     ? `<button class="btn-tomorrow" data-action="viewTomorrow">Planifier demain →</button>`
     : '';
 
-  // #8 — AI prompt button (shown in history edit view and today)
   const aiBtn = `<button class="btn-ai-prompt" data-action="copyAiPrompt" data-date="${date}">🤖 Générer un prompt IA</button>`;
 
   return `
   <div class="view-day">
     ${header}
     ${creatineBtn}
+    ${estimateBadge}
     ${summary}
+    ${estimateBtn}
     ${mealsHtml}
     ${tomorrowBtn}
     ${aiBtn}
@@ -444,10 +475,12 @@ function renderHistory() {
 
   // ── Render a single day card ────────────────────────────────
   const renderDayCard = (d, highlight = '') => {
-    const day    = S.days[d];
-    const totals = calcMacros(allEntries(day));
-    const goals  = S.goals[day.type];
-    const pct    = goals.kcal > 0 ? clamp(totals.kcal / goals.kcal * 100, 0, 100) : 0;
+    const day     = S.days[d];
+    const totals  = getEffectiveTotals(day);
+    const goals   = S.goals[day.type];
+    const isEst   = !allEntries(day).length && !!day.estimated;
+    const isEmpty = isDayEmpty(day);
+    const pct     = goals.kcal > 0 ? clamp(totals.kcal / goals.kcal * 100, 0, 100) : 0;
     const badge  = day.type === 'sport'
       ? `<span class="badge-sport">Sport ⚡</span>`
       : `<span class="badge-rest">Repos 🌙</span>`;
@@ -488,13 +521,19 @@ function renderHistory() {
     })() : '';
 
     return `
-    <div class="hist-card${highlight ? ' hist-card-search-match' : ''}">
+    <div class="hist-card${highlight ? ' hist-card-search-match' : ''}${isEmpty ? ' hist-card-empty' : ''}">
       <div class="hist-card-head">
         <span class="hist-date">${fmtDate(d)}</span>
         ${badge}
+        ${isEst ? `<span class="badge-estimated">~ Estimé</span>` : ''}
         ${day.creatine ? `<span title="Créatine prise">💪🏼</span>` : ''}
         <button class="btn-edit-sm" data-action="editHistDay" data-date="${d}">✎ Modifier</button>
       </div>
+      ${isEmpty ? `
+      <div class="hist-empty-day">
+        <span>Journée non journalisée</span>
+        <button class="btn-estimate-sm" data-action="openDayEstimate" data-date="${d}">~ Estimer</button>
+      </div>` : `
       <div class="hist-macros">
         <span class="hist-kcal">${totals.kcal} kcal</span>
         <span class="pill-sm" style="color:#7eb8f7">P ${totals.p}g</span>
@@ -512,17 +551,20 @@ function renderHistory() {
       ${highlightItems}
       <div class="hist-bar-track">
         <div class="hist-bar-fill" style="width:${pct}%"></div>
-      </div>
+      </div>`}
     </div>`;
   };
 
   // ── Render week summary header ──────────────────────────────
   const renderWeekHeader = (wDates, wg, isCurrent, isCollapsed) => {
-    const n = wDates.length;
+    // Exclude truly empty days from averages
+    const activeDates = wDates.filter(d => !isDayEmpty(S.days[d]));
+    const n = activeDates.length;
+    if (n === 0) return ''; // no data yet this week
     let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
-    for (const d of wDates) {
+    for (const d of activeDates) {
       const day = S.days[d];
-      const t = calcMacros(allEntries(day));
+      const t = getEffectiveTotals(day);
       sumK += t.kcal; sumP += t.p; sumG += t.g; sumL += t.l;
       if (day.burned) { sumB += day.burned; bCount++; }
       if (day.type === 'sport') sport++;
@@ -544,14 +586,15 @@ function renderHistory() {
       if (!avgB || n < 1) return '';
       const totalIngested = Math.round(sumK);
       const totalBurned   = Math.round(sumB);
-      const totalBalance  = totalBurned - totalIngested; // positive = deficit
-      const fatGrams      = Math.round(Math.abs(totalBalance) / 7.7); // ~7700 kcal/kg fat → 7.7 kcal/g
+      const totalBalance  = totalBurned - totalIngested;
+      const fatGrams      = Math.round(Math.abs(totalBalance) / 7.7);
       const sign          = totalBalance >= 0 ? '−' : '+';
       const label         = totalBalance >= 0 ? 'Déficit' : 'Surplus';
       return `<div style="font-size:12px;margin-top:4px;color:#666">
         ${label} semaine : ${sign}${Math.abs(totalBalance)} kcal · ≈ ${sign}${fatGrams}g de gras théorique
       </div>`;
     })();
+    const totalDays = wDates.length; // all days including empty (for display)
     const weekKey = `${wg.year}-${String(wg.weekNum).padStart(2,'0')}`;
     const toggleBtn = !isCurrent
       ? `<button class="week-collapse-btn" data-action="toggleWeek" data-key="${weekKey}">${isCollapsed ? '▸' : '▾'}</button>`
@@ -562,7 +605,7 @@ function renderHistory() {
       <div class="week-header-row" ${!isCurrent ? `data-action="toggleWeek" data-key="${weekKey}"` : ''}>
         <div class="week-header-left">
           <span class="week-label">${label}</span>
-          <span class="week-badges">${sport}⚡ ${n-sport}🌙 · ${n}j</span>
+          <span class="week-badges">${sport}⚡ ${n-sport}🌙 · ${n}j journalisés${totalDays > n ? ` (${totalDays-n} vide${totalDays-n>1?'s':''})` : ''}</span>
         </div>
         ${toggleBtn}
       </div>
@@ -943,6 +986,7 @@ function renderModal() {
     case 'deleteFoodConfirm': content = renderDeleteFoodConfirmModal(); break;
     case 'quickMeal':   content = renderQuickMealModal();   break;
     case 'burnedInput': content = renderBurnedInputModal(); break;
+    case 'dayEstimate': content = renderDayEstimateModal(); break;
     default: return '';
   }
   return `
@@ -1249,6 +1293,45 @@ function renderEditFoodDBModal() {
   <div class="modal-edit-actions nav-spacer">
     <button class="btn-delete" data-action="deleteFoodDB" data-id="${f.id}">Supprimer</button>
     <button class="btn-confirm" data-action="updateFoodDB" data-id="${f.id}">Enregistrer</button>
+  </div>`;
+}
+
+// ── Modal: Day Estimation ────────────────────────────────────
+
+function renderDayEstimateModal() {
+  const date = S.md.date || '';
+  const day  = S.days[date];
+  const est  = day?.estimated;
+  return `
+  <h3 class="modal-title">~ Estimer ma journée</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:16px;line-height:1.5">
+    Tu n'as pas journalisé ce jour. Rentre une estimation globale — elle sera utilisée dans les statistiques avec un badge "Estimé".
+  </p>
+  <div class="form-group">
+    <label>Calories estimées (kcal)</label>
+    <input type="number" class="form-input" id="est-kcal"
+      value="${est?.kcal || ''}" placeholder="ex : 2100" inputmode="decimal">
+  </div>
+  <div class="form-row-3">
+    <div class="form-group">
+      <label>Protéines (g)</label>
+      <input type="number" class="form-input" id="est-p"
+        value="${est?.p || ''}" placeholder="150" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Glucides (g)</label>
+      <input type="number" class="form-input" id="est-g"
+        value="${est?.g || ''}" placeholder="200" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label>Lipides (g)</label>
+      <input type="number" class="form-input" id="est-l"
+        value="${est?.l || ''}" placeholder="70" inputmode="decimal">
+    </div>
+  </div>
+  <div class="modal-edit-actions nav-spacer">
+    ${est ? `<button class="btn-delete" data-action="clearDayEstimate">Supprimer</button>` : ''}
+    <button class="btn-confirm ${est ? '' : 'nav-spacer'}" data-action="saveDayEstimate">Enregistrer</button>
   </div>`;
 }
 
@@ -2106,6 +2189,40 @@ function handleClick(e) {
       render();
       setTimeout(() => document.getElementById('burned-input')?.focus(), 80);
       break;
+
+    case 'openDayEstimate':
+      S.modal = 'dayEstimate';
+      S.md    = { date: el.dataset.date };
+      render();
+      setTimeout(() => document.getElementById('est-kcal')?.focus(), 80);
+      break;
+
+    case 'saveDayEstimate': {
+      const kcal = +document.getElementById('est-kcal')?.value || 0;
+      const p    = +document.getElementById('est-p')?.value    || 0;
+      const g    = +document.getElementById('est-g')?.value    || 0;
+      const l    = +document.getElementById('est-l')?.value    || 0;
+      const date = S.md.date;
+      if (!kcal) { showToast('Entre au moins les calories.'); break; }
+      const day  = getDay(date);
+      day.estimated = { kcal, p, g, l };
+      save();
+      S.modal = null; S.md = {};
+      showToast('Estimation enregistrée ~');
+      render();
+      break;
+    }
+
+    case 'clearDayEstimate': {
+      const date = S.md.date;
+      const day  = getDay(date);
+      day.estimated = null;
+      save();
+      S.modal = null; S.md = {};
+      showToast('Estimation supprimée.');
+      render();
+      break;
+    }
 
     case 'saveBurned': {
       const val  = +document.getElementById('burned-input')?.value || 0;
