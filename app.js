@@ -100,9 +100,9 @@ function getEffectiveTotals(day) {
   return { kcal: 0, p: 0, g: 0, l: 0 };
 }
 
-// A day is "empty" if no food AND no estimation
+// A day is "empty" (excluded from averages) if no food AND no estimation AND no burned data
 function isDayEmpty(day) {
-  return allEntries(day).length === 0 && !day.estimated;
+  return allEntries(day).length === 0 && !day.estimated && !day.burned;
 }
 
 function calcMacros(entries) {
@@ -531,8 +531,13 @@ function renderHistory() {
       </div>
       ${isEmpty ? `
       <div class="hist-empty-day">
-        <span>Journée non journalisée</span>
-        <button class="btn-estimate-sm" data-action="openDayEstimate" data-date="${d}">~ Estimer</button>
+        <span>Non journalisée</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${!day.burned
+            ? `<button class="btn-add-burned" data-action="openBurnedInput" data-date="${d}">⌚ +Watch</button>`
+            : `<span class="pill-sm" style="color:#f0c040">⌚ ${day.burned} kcal</span>`}
+          <button class="btn-estimate-sm" data-action="openDayEstimate" data-date="${d}">~ Estimer</button>
+        </div>
       </div>` : `
       <div class="hist-macros">
         <span class="hist-kcal">${totals.kcal} kcal</span>
