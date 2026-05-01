@@ -78,11 +78,11 @@ function fmtDateShort(ds) {
 
 function getDay(date) {
   if (!S.days[date]) {
-    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, creatine: null, burned: null, estimated: null };
+    S.days[date] = { type: 'sport', meals: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[], 7:[], 8:[], 9:[], 10:[] }, creatine: null, burned: null, estimated: null };
     save();
   }
   // Ensure all 6 meals exist (migration safety)
-  for (let m = 1; m <= 6; m++) {
+  for (let m = 1; m <= 10; m++) {
     if (!S.days[date].meals[m]) S.days[date].meals[m] = [];
   }
   return S.days[date];
@@ -155,7 +155,7 @@ function getStreak() {
   while (true) {
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const day = S.days[ds];
-    if (!day || ![1,2,3,4,5,6].some(m => (day.meals[m]||[]).length > 0)) break;
+    if (!day || ![1,2,3,4,5,6,7,8,9,10].some(m => (day.meals[m]||[]).length > 0)) break;
     streak++;
     d.setDate(d.getDate() - 1);
   }
@@ -166,21 +166,21 @@ function getStreak() {
 function foodUseCount(foodId) {
   let n = 0;
   for (const day of Object.values(S.days))
-    for (let m = 1; m <= 6; m++)
+    for (let m = 1; m <= 10; m++)
       for (const e of (day.meals[m]||[])) if (e.foodId === foodId) n++;
   return n;
 }
 function foodLastUsed(foodId) {
   let last = '';
   for (const [date, day] of Object.entries(S.days))
-    for (let m = 1; m <= 6; m++)
+    for (let m = 1; m <= 10; m++)
       if ((day.meals[m]||[]).some(e => e.foodId === foodId) && date > last) last = date;
   return last;
 }
 function findFoodUsage(foodId) {
   const uses = [];
   for (const [date, day] of Object.entries(S.days))
-    for (let m = 1; m <= 6; m++)
+    for (let m = 1; m <= 10; m++)
       if ((day.meals[m]||[]).some(e => e.foodId === foodId)) uses.push({ date, meal: m });
   return uses;
 }
@@ -323,7 +323,7 @@ function renderDayView(date) {
     : '';
 
   let mealsHtml = '<div class="meals">';
-  for (let m = 1; m <= 6; m++) {
+  for (let m = 1; m <= 10; m++) {
     const entries  = day.meals[m] || [];
     const mTotals  = calcMacros(entries);
     const hasFood  = entries.length > 0;
@@ -508,7 +508,7 @@ function renderHistory() {
     const highlightItems = highlight ? (() => {
       const q = highlight.toLowerCase();
       const matches = [];
-      for (let m = 1; m <= 6; m++) {
+      for (let m = 1; m <= 10; m++) {
         for (const e of (day.meals[m] || [])) {
           const f = S.foods.find(x => x.id === e.foodId);
           if (f && f.name.toLowerCase().includes(q)) {
@@ -633,7 +633,7 @@ function renderHistory() {
       .filter(d => d < today)
       .filter(d => {
         const day = S.days[d];
-        return [1,2,3,4,5,6].some(m =>
+        return [1,2,3,4,5,6,7,8,9,10].some(m =>
           (day.meals[m] || []).some(e => {
             const f = S.foods.find(x => x.id === e.foodId);
             return f && f.name.toLowerCase().includes(q);
@@ -1497,7 +1497,7 @@ function renderCopyMealModal() {
   const isToday    = date === todayStr();
   const isTomorrow = date === tomorrowStr();
 
-  const mealBtns = [1,2,3,4,5,6].map(n => `
+  const mealBtns = [1,2,3,4,5,6,7,8,9,10].map(n => `
     <button class="copy-meal-btn ${n === meal ? 'copy-meal-btn-self' : ''}"
       data-action="confirmCopyMeal" data-dest-meal="${n}" data-dest-date="${date}">
       Repas ${n}${n === meal ? ' ●' : ''}
@@ -1505,7 +1505,7 @@ function renderCopyMealModal() {
 
   const otherDate = isToday ? tomorrowStr() : todayStr();
   const otherLabel = isToday ? 'demain' : "aujourd'hui";
-  const otherMealBtns = [1,2,3,4,5,6].map(n => `
+  const otherMealBtns = [1,2,3,4,5,6,7,8,9,10].map(n => `
     <button class="copy-meal-btn"
       data-action="confirmCopyMeal" data-dest-meal="${n}" data-dest-date="${otherDate}">
       Repas ${n}
@@ -2075,7 +2075,7 @@ function handleClick(e) {
       for (const id of ids) {
         S.foods = S.foods.filter(x => x.id !== id);
         for (const day of Object.values(S.days))
-          for (let m = 1; m <= 6; m++)
+          for (let m = 1; m <= 10; m++)
             if (day.meals[m]) day.meals[m] = day.meals[m].filter(e => e.foodId !== id);
       }
       save();
@@ -2255,7 +2255,7 @@ function handleClick(e) {
 
       // Build food list per meal
       let mealsText = '';
-      for (let m = 1; m <= 6; m++) {
+      for (let m = 1; m <= 10; m++) {
         const entries = day.meals[m] || [];
         if (!entries.length) continue;
         mealsText += `\nRepas ${m} :\n`;
@@ -2715,7 +2715,7 @@ function buildDayExportData(date, day) {
 
   // Per-meal detail with food names resolved
   const mealsDetail = {};
-  for (let m = 1; m <= 6; m++) {
+  for (let m = 1; m <= 10; m++) {
     const entries = day.meals[m] || [];
     if (!entries.length) continue;
     const mTotals = calcMacros(entries);
@@ -2763,15 +2763,13 @@ function exportHistoryCSV() {
     'L_g', 'L_objectif', 'L_delta',
     'Calories_Watch', 'Deficit_net',
     'Creatine',
-    'Repas1_kcal', 'Repas2_kcal', 'Repas3_kcal',
-    'Repas4_kcal', 'Repas5_kcal', 'Repas6_kcal'
   ];
 
   const rows = Object.entries(S.days)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, day]) => {
       const d = buildDayExportData(date, day);
-      const mKcal = [1,2,3,4,5,6].map(m => {
+      const mKcal = [1,2,3,4,5,6,7,8,9,10].map(m => {
         const entries = day.meals[m] || [];
         return entries.length ? calcMacros(entries).kcal : '';
       });
