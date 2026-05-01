@@ -89,7 +89,7 @@ function getDay(date) {
 }
 
 function allEntries(day) {
-  return [1, 2, 3, 4, 5, 6].flatMap(m => day.meals[m] || []);
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(m => day.meals[m] || []);
 }
 
 // Returns real macros if food logged, else estimation if set, else zeros
