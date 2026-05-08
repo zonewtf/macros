@@ -2243,17 +2243,17 @@ function handleClick(e) {
 
     // ── #8 — AI prompt generator
     case 'copyAiPrompt': {
-      const date    = el.dataset.date;
-      const day     = S.days[date];
+      const date   = el.dataset.date;
+      const day    = S.days[date];
       if (!day) { showToast('Aucune donnée pour ce jour.'); break; }
-      const goals   = S.goals[day.type];
-      const totals  = calcMacros(allEntries(day));
-      const remKcal = goals.kcal - totals.kcal;
-      const remP    = +(goals.p - totals.p).toFixed(1);
-      const remG    = +(goals.g - totals.g).toFixed(1);
-      const remL    = +(goals.l - totals.l).toFixed(1);
+      const goals  = S.goals[day.type];
+      const totals = getEffectiveTotals(day);
+      const remKcal = totals.kcal - goals.kcal;
+      const remP    = +(totals.p - goals.p).toFixed(1);
+      const remG    = +(totals.g - goals.g).toFixed(1);
+      const remL    = +(totals.l - goals.l).toFixed(1);
 
-      // Build food list per meal
+      // Build food list per meal (exact format requested)
       let mealsText = '';
       for (let m = 1; m <= 10; m++) {
         const entries = day.meals[m] || [];
@@ -2262,38 +2262,40 @@ function handleClick(e) {
         for (const e of entries) {
           const f = S.foods.find(x => x.id === e.foodId);
           if (!f) continue;
-          const qty = f.unitWeight ? `${+(e.grams/f.unitWeight).toFixed(1)} unité(s)` : `${e.grams}g`;
-          const mc  = calcMacros([e]);
+          const qty = f.unitWeight
+            ? `${+(e.grams / f.unitWeight).toFixed(1)} unité(s)`
+            : `${e.grams}g`;
+          const mc = calcMacros([e]);
           mealsText += `  - ${f.name} (${qty}) → ${mc.kcal} kcal | P ${mc.p}g | G ${mc.g}g | L ${mc.l}g\n`;
         }
       }
 
-      const typeLabel = day.type === 'sport' ? 'Sport' : 'Repos';
-      const prompt = `Tu es un nutritionniste expert. Voici mon bilan nutritionnel du ${fmtDate(date)} (jour ${typeLabel}) :
+      // If estimated day with no real meals
+      if (!mealsText && day.estimated) {
+        mealsText = `\n~ Journée estimée globalement\n`;
+      }
 
-OBJECTIFS DU JOUR :
+      const fmtRem = v => v > 0 ? `+${v}` : `${v}`;
+      const recap = `OBJECTIFS DU JOUR :
 - Calories : ${goals.kcal} kcal | Protéines : ${goals.p}g | Glucides : ${goals.g}g | Lipides : ${goals.l}g
 
 DÉJÀ CONSOMMÉ :
 - Calories : ${totals.kcal} kcal | Protéines : ${totals.p}g | Glucides : ${totals.g}g | Lipides : ${totals.l}g
 ${mealsText}
 RESTE À COMBLER :
-- Calories : ${remKcal} kcal | Protéines : ${remP}g | Glucides : ${remG}g | Lipides : ${remL}g
+- Calories : ${fmtRem(remKcal)} kcal | Protéines : ${fmtRem(remP)}g | Glucides : ${fmtRem(remG)}g | Lipides : ${fmtRem(remL)}g`;
 
-Propose-moi 5 idées de repas ou snacks simples et savoureux pour atteindre exactement mes objectifs restants. Pour chaque idée, indique les macros approximatives. Tiens compte de ce que j'ai déjà mangé pour varier les aliments.`;
-
-      navigator.clipboard.writeText(prompt).then(() => {
-        showToast('Prompt copié ! Colle-le dans ton IA 🤖');
+      navigator.clipboard.writeText(recap).then(() => {
+        showToast('Récap copié ! 📋');
       }).catch(() => {
-        // Fallback: show in a temporary textarea
         const ta = document.createElement('textarea');
-        ta.value = prompt;
+        ta.value = recap;
         ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast('Prompt copié ! Colle-le dans ton IA 🤖');
+        showToast('Récap copié ! 📋');
       });
       break;
     }
@@ -2708,12 +2710,12 @@ function updateMacrosPreview() {
 // ── Helpers export ───────────────────────────────────────────
 
 function buildDayExportData(date, day) {
-  const goals  = S.goals[day.type];
-  const totals = calcMacros(allEntries(day));
-  const burned = day.burned || null;
+  const goals   = S.goals[day.type];
+  const totals  = getEffectiveTotals(day);   // ← utilise estimation si pas de nourriture
+  const burned  = day.burned || null;
   const deficit = burned !== null ? burned - totals.kcal : null;
+  const isEst   = allEntries(day).length === 0 && !!day.estimated;
 
-  // Per-meal detail with food names resolved
   const mealsDetail = {};
   for (let m = 1; m <= 10; m++) {
     const entries = day.meals[m] || [];
@@ -2737,12 +2739,13 @@ function buildDayExportData(date, day) {
     date,
     jour: fmtDate(date),
     type: day.type,
+    journalise: isEst ? 'estimé' : (allEntries(day).length > 0 ? 'oui' : 'non'),
     creatine: day.creatine || null,
     calories_depensees_watch: burned,
     deficit_net_kcal: deficit,
     objectifs: { kcal: goals.kcal, p: goals.p, g: goals.g, l: goals.l },
     consomme:  { kcal: totals.kcal, p: totals.p, g: totals.g, l: totals.l },
-    delta:     {
+    delta: {
       kcal: totals.kcal - goals.kcal,
       p: +(totals.p - goals.p).toFixed(1),
       g: +(totals.g - goals.g).toFixed(1),
@@ -2755,17 +2758,20 @@ function buildDayExportData(date, day) {
 // ── Export CSV Historique (étendu) ────────────────────────────
 
 function exportHistoryCSV() {
+  const today  = todayStr();
   const header = [
-    'Date', 'Jour', 'Type',
+    'Date', 'Jour', 'Type', 'Journalise',
     'Kcal_consommees', 'Kcal_objectif', 'Kcal_delta',
     'P_g', 'P_objectif', 'P_delta',
     'G_g', 'G_objectif', 'G_delta',
     'L_g', 'L_objectif', 'L_delta',
-    'Calories_Watch', 'Deficit_net',
-    'Creatine',
+    'Calories_Watch', 'Deficit_net', 'Creatine',
+    'Repas1_kcal','Repas2_kcal','Repas3_kcal','Repas4_kcal','Repas5_kcal',
+    'Repas6_kcal','Repas7_kcal','Repas8_kcal','Repas9_kcal','Repas10_kcal'
   ];
 
   const rows = Object.entries(S.days)
+    .filter(([date, day]) => date < today && !isDayEmpty(day))  // ← exclut vides et futurs
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, day]) => {
       const d = buildDayExportData(date, day);
@@ -2774,7 +2780,7 @@ function exportHistoryCSV() {
         return entries.length ? calcMacros(entries).kcal : '';
       });
       return [
-        date, `"${d.jour}"`, d.type,
+        date, `"${d.jour}"`, d.type, d.journalise,
         d.consomme.kcal, d.objectifs.kcal, d.delta.kcal,
         d.consomme.p, d.objectifs.p, d.delta.p,
         d.consomme.g, d.objectifs.g, d.delta.g,
@@ -2788,51 +2794,62 @@ function exportHistoryCSV() {
 
   const csv = [header.join(','), ...rows].join('\n');
   download('macros-historique-complet.csv', csv, 'text/csv;charset=utf-8;');
-  showToast('CSV historique complet exporté !');
+  showToast(`CSV exporté — ${rows.length} jour(s) journalisés`);
 }
 
 // ── Export JSON Historique (étendu) ───────────────────────────
 
 function exportHistoryJSON() {
-  const sortedDates = Object.keys(S.days).sort((a, b) => b.localeCompare(a));
+  const today = todayStr();
+  // Exclude empty days and today/future
+  const sortedDates = Object.keys(S.days)
+    .filter(d => d < today && !isDayEmpty(S.days[d]))
+    .sort((a, b) => b.localeCompare(a));
+
   const days = sortedDates.map(date => buildDayExportData(date, S.days[date]));
 
-  // Weekly summaries
+  // Weekly summaries using getEffectiveTotals, excluding empty days
   const weeks = {};
-  for (const d of days) {
-    const dt   = new Date(d.date + 'T12:00:00');
+  for (const date of sortedDates) {
+    const day  = S.days[date];
+    const t    = getEffectiveTotals(day);
+    const dt   = new Date(date + 'T12:00:00');
     const mon  = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
     const wKey = mon.toISOString().slice(0, 10);
-    if (!weeks[wKey]) weeks[wKey] = { debut: wKey, jours: [], totaux: { kcal: 0, p: 0, g: 0, l: 0, burned: 0, burnedCount: 0, sport: 0, repos: 0 } };
-    weeks[wKey].jours.push(d.date);
-    weeks[wKey].totaux.kcal   += d.consomme.kcal;
-    weeks[wKey].totaux.p      += d.consomme.p;
-    weeks[wKey].totaux.g      += d.consomme.g;
-    weeks[wKey].totaux.l      += d.consomme.l;
-    if (d.calories_depensees_watch) { weeks[wKey].totaux.burned += d.calories_depensees_watch; weeks[wKey].totaux.burnedCount++; }
-    d.type === 'sport' ? weeks[wKey].totaux.sport++ : weeks[wKey].totaux.repos++;
+    if (!weeks[wKey]) weeks[wKey] = { debut: wKey, jours: 0, totaux: { kcal: 0, p: 0, g: 0, l: 0, burned: 0, burnedCount: 0, sport: 0, repos: 0 } };
+    weeks[wKey].jours++;
+    weeks[wKey].totaux.kcal += t.kcal;
+    weeks[wKey].totaux.p    += t.p;
+    weeks[wKey].totaux.g    += t.g;
+    weeks[wKey].totaux.l    += t.l;
+    if (day.burned) { weeks[wKey].totaux.burned += day.burned; weeks[wKey].totaux.burnedCount++; }
+    day.type === 'sport' ? weeks[wKey].totaux.sport++ : weeks[wKey].totaux.repos++;
   }
+
   const weeklySummaries = Object.values(weeks)
     .sort((a, b) => b.debut.localeCompare(a.debut))
     .map(w => {
-      const n = w.jours.length;
+      const n         = w.jours;
       const avgBurned = w.totaux.burnedCount > 0 ? Math.round(w.totaux.burned / w.totaux.burnedCount) : null;
-      const sun = new Date(w.debut + 'T12:00:00'); sun.setDate(sun.getDate() + 6);
-      const sundayStr = sun.toISOString().slice(0, 10);
-      const { week } = getISOWeek(w.debut);
+      const avgKcal   = Math.round(w.totaux.kcal / n);
+      const sun       = new Date(w.debut + 'T12:00:00'); sun.setDate(sun.getDate() + 6);
+      const { week }  = getISOWeek(w.debut);
+      const totalBal  = avgBurned ? (w.totaux.burned / w.totaux.burnedCount) * n - w.totaux.kcal : null;
       return {
-        semaine: weekLabel(week, w.debut, sundayStr),
-        semaine_debut: w.debut,
-        nb_jours: n,
-        repartition: `${w.totaux.sport} sport · ${w.totaux.repos} repos`,
+        semaine:        weekLabel(week, w.debut, sun.toISOString().slice(0, 10)),
+        semaine_debut:  w.debut,
+        nb_jours_journalises: n,
+        repartition:    `${w.totaux.sport} sport · ${w.totaux.repos} repos`,
         moyennes: {
-          kcal: Math.round(w.totaux.kcal / n),
-          p:    +(w.totaux.p / n).toFixed(1),
-          g:    +(w.totaux.g / n).toFixed(1),
-          l:    +(w.totaux.l / n).toFixed(1),
+          kcal:           avgKcal,
+          p:              +(w.totaux.p / n).toFixed(1),
+          g:              +(w.totaux.g / n).toFixed(1),
+          l:              +(w.totaux.l / n).toFixed(1),
           calories_watch: avgBurned
         },
-        deficit_moyen: avgBurned ? avgBurned - Math.round(w.totaux.kcal / n) : null
+        deficit_moyen_jour:   avgBurned ? avgBurned - avgKcal : null,
+        bilan_semaine_kcal:   totalBal !== null ? Math.round(totalBal) : null,
+        gras_theorique_g:     totalBal !== null ? Math.round(Math.abs(totalBal) / 7.7) : null
       };
     });
 
@@ -2841,7 +2858,7 @@ function exportHistoryJSON() {
     app: 'Mes Macros',
     objectifs: S.goals,
     resume_global: {
-      nb_jours_total: days.length,
+      nb_jours_journalises: days.length,
       periode: days.length ? `${days[days.length-1].date} → ${days[0].date}` : 'N/A'
     },
     resumés_hebdomadaires: weeklySummaries,
@@ -2849,54 +2866,50 @@ function exportHistoryJSON() {
   };
 
   download('macros-historique-complet.json', JSON.stringify(data, null, 2), 'application/json');
-  showToast('JSON historique complet exporté !');
+  showToast(`JSON exporté — ${days.length} jour(s) journalisés`);
 }
 
 // ── Export Markdown (pour analyse IA) ─────────────────────────
 
 function exportHistoryMarkdown() {
-  const sortedDates = Object.keys(S.days).sort((a, b) => b.localeCompare(a));
-  if (!sortedDates.length) { showToast('Aucun historique à exporter.'); return; }
+  const today = todayStr();
+  const sortedDates = Object.keys(S.days)
+    .filter(d => d < today && !isDayEmpty(S.days[d]))
+    .sort((a, b) => b.localeCompare(a));
+
+  if (!sortedDates.length) { showToast('Aucun historique journalisé à exporter.'); return; }
 
   const lines = [];
   lines.push('# Mes Macros — Export Historique Nutritionnel');
   lines.push(`\n*Exporté le ${new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'})}*\n`);
   lines.push('---\n');
 
-  // Objectifs
   lines.push('## Objectifs');
   for (const [type, g] of [['Sport ⚡', S.goals.sport], ['Repos 🌙', S.goals.rest]]) {
     lines.push(`\n**${type}** — ${g.kcal} kcal | P ${g.p}g | G ${g.g}g | L ${g.l}g`);
   }
   lines.push('\n---\n');
 
-  // Weekly summaries
-  const weeks = {};
-  for (const date of sortedDates) {
-    const dt  = new Date(date + 'T12:00:00');
-    const mon = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
-    const wKey = mon.toISOString().slice(0, 10);
-    if (!weeks[wKey]) weeks[wKey] = [];
-    weeks[wKey].push(date);
-  }
-
+  // Weekly summaries — use getEffectiveTotals, exclude empty days
   lines.push('## Résumés hebdomadaires\n');
   const wGroups = groupDaysByWeek(sortedDates);
   for (const wg of wGroups) {
-    const wDates = wg.dates.sort((a, b) => a.localeCompare(b));
+    const wDates = wg.dates.filter(d => !isDayEmpty(S.days[d])).sort((a, b) => a.localeCompare(b));
+    if (!wDates.length) continue;
     const n = wDates.length;
     let sumK = 0, sumP = 0, sumG = 0, sumL = 0, sumB = 0, bCount = 0, sport = 0;
     for (const d of wDates) {
       const day = S.days[d];
-      const t = calcMacros(allEntries(day));
+      const t   = getEffectiveTotals(day);
       sumK += t.kcal; sumP += t.p; sumG += t.g; sumL += t.l;
       if (day.burned) { sumB += day.burned; bCount++; }
       if (day.type === 'sport') sport++;
     }
-    const avgK = Math.round(sumK/n), avgB = bCount ? Math.round(sumB/bCount) : null;
+    const avgK = Math.round(sumK/n);
+    const avgB = bCount ? Math.round(sumB/bCount) : null;
     const def  = avgB ? avgB - avgK : null;
     lines.push(`### ${wg.label}`);
-    lines.push(`- ${n} jours : ${sport} Sport · ${n-sport} Repos`);
+    lines.push(`- ${n} jours journalisés : ${sport} Sport · ${n-sport} Repos`);
     lines.push(`- Moy. kcal ingérées : **${avgK} kcal** | P ${+(sumP/n).toFixed(1)}g | G ${+(sumG/n).toFixed(1)}g | L ${+(sumL/n).toFixed(1)}g`);
     if (avgB) lines.push(`- Moy. kcal dépensées (Watch) : ${avgB} kcal`);
     if (def)  lines.push(`- Déficit moyen : **${def > 0 ? '−'+def : '+'+Math.abs(def)} kcal/j**`);
@@ -2907,33 +2920,37 @@ function exportHistoryMarkdown() {
   lines.push('## Détail par jour\n');
 
   for (const date of sortedDates) {
-    const d = buildDayExportData(date, S.days[date]);
+    const day = S.days[date];
+    const d   = buildDayExportData(date, day);
+    const isEst = d.journalise === 'estimé';
     const typeLabel = d.type === 'sport' ? 'Sport ⚡' : 'Repos 🌙';
-    lines.push(`### ${d.jour} — ${typeLabel}`);
-
-    // Summary line
     const deltaSign = v => v > 0 ? `+${v}` : `${v}`;
+
+    lines.push(`### ${d.jour} — ${typeLabel}${isEst ? ' *(estimé)*' : ''}`);
     lines.push(`**Consommé :** ${d.consomme.kcal} kcal | P ${d.consomme.p}g | G ${d.consomme.g}g | L ${d.consomme.l}g`);
     lines.push(`**Objectif :** ${d.objectifs.kcal} kcal | P ${d.objectifs.p}g | G ${d.objectifs.g}g | L ${d.objectifs.l}g`);
     lines.push(`**Delta :** ${deltaSign(d.delta.kcal)} kcal | P ${deltaSign(d.delta.p)}g | G ${deltaSign(d.delta.g)}g | L ${deltaSign(d.delta.l)}g`);
-
     if (d.calories_depensees_watch) {
-      lines.push(`**Watch :** ${d.calories_depensees_watch} kcal dépensées → Déficit net : ${d.deficit_net_kcal > 0 ? '−'+d.deficit_net_kcal : '+'+Math.abs(d.deficit_net_kcal)} kcal`);
+      const def = d.deficit_net_kcal;
+      lines.push(`**Watch :** ${d.calories_depensees_watch} kcal → ${def > 0 ? 'Déficit −'+def : 'Surplus +'+Math.abs(def)} kcal`);
     }
     if (d.creatine) lines.push(`**Créatine :** prise à ${d.creatine} 💪🏼`);
 
-    // Meals detail
-    for (const [mealName, mealData] of Object.entries(d.repas)) {
-      lines.push(`\n**${mealName}** (${mealData.total.kcal} kcal | P ${mealData.total.p}g | G ${mealData.total.g}g | L ${mealData.total.l}g)`);
-      for (const item of mealData.aliments) {
-        lines.push(`  - ${item.nom} — ${item.quantite} → ${item.kcal} kcal | P ${item.p}g | G ${item.g}g | L ${item.l}g`);
+    if (isEst) {
+      lines.push(`*Journée estimée globalement — pas de détail par repas*`);
+    } else {
+      for (const [mealName, mealData] of Object.entries(d.repas)) {
+        lines.push(`\n**${mealName}** (${mealData.total.kcal} kcal | P ${mealData.total.p}g | G ${mealData.total.g}g | L ${mealData.total.l}g)`);
+        for (const item of mealData.aliments) {
+          lines.push(`  - ${item.nom} — ${item.quantite} → ${item.kcal} kcal | P ${item.p}g | G ${item.g}g | L ${item.l}g`);
+        }
       }
     }
     lines.push('');
   }
 
   download('macros-historique-ia.md', lines.join('\n'), 'text/markdown;charset=utf-8;');
-  showToast('Export Markdown pour IA téléchargé !');
+  showToast(`Markdown exporté — ${sortedDates.length} jour(s) journalisés`);
 }
 
 // ── Export CSV Aliments ───────────────────────────────────────
