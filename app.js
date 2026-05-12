@@ -951,12 +951,14 @@ function renderSettings() {
         <span class="settings-label">Export des données</span>
       </div>
       <div style="font-size:12px;color:#666;margin-bottom:10px">Historique des jours</div>
-      <div class="export-row" style="margin-bottom:10px">
-        <button class="btn-export" data-action="exportHistoryCSV">⬇ CSV Historique</button>
-        <button class="btn-export" data-action="exportHistoryJSON">⬇ JSON Historique</button>
+      <div class="export-period-grid">
+        <button class="btn-export-period" data-action="openExportPeriod" data-period="week">📅 Cette semaine</button>
+        <button class="btn-export-period" data-action="openExportPeriod" data-period="month">📅 Ce mois</button>
+        <button class="btn-export-period" data-action="openExportPeriod" data-period="30">📅 30 derniers jours</button>
+        <button class="btn-export-period" data-action="openExportPeriod" data-period="all">📅 Tout l'historique</button>
       </div>
-      <button class="btn-export" style="width:100%;margin-bottom:10px;border-color:rgba(200,216,240,0.2);color:#7eb8f7" data-action="exportHistoryMarkdown">🤖 Markdown pour IA (complet)</button>
-      <div style="font-size:12px;color:#666;margin-bottom:10px">Ma base d'aliments</div>
+      <button class="btn-export" style="width:100%;margin-top:8px" data-action="openExportPeriod" data-period="custom">✏️ Choisir les dates</button>
+      <div style="font-size:12px;color:#666;margin:12px 0 10px">Ma base d'aliments</div>
       <div class="export-row">
         <button class="btn-export" data-action="exportFoodsCSV">⬇ CSV Aliments</button>
         <button class="btn-export" data-action="exportFullJSON">⬇ JSON Complet</button>
@@ -990,7 +992,8 @@ function renderModal() {
     case 'copyMeal':   content = renderCopyMealModal();        break;
     case 'deleteFoodConfirm': content = renderDeleteFoodConfirmModal(); break;
     case 'quickMeal':   content = renderQuickMealModal();   break;
-    case 'burnedInput': content = renderBurnedInputModal(); break;
+    case 'burnedInput':    content = renderBurnedInputModal();    break;
+    case 'exportPeriod':   content = renderExportPeriodModal();   break;
     case 'dayEstimate': content = renderDayEstimateModal(); break;
     default: return '';
   }
@@ -1562,6 +1565,58 @@ function renderQuickMealModal() {
        </div>`
     : `<button class="btn-confirm nav-spacer" data-action="saveQuickMeal">Enregistrer le repas</button>`
   }`;
+}
+
+// ── Modal: Export Period ─────────────────────────────────────
+
+function renderExportPeriodModal() {
+  const { period, from, to } = S.md;
+  const today = todayStr();
+
+  // Count matching days
+  const count = Object.keys(S.days).filter(d => {
+    const day = S.days[d];
+    if (d >= today) return false;
+    if (isDayEmpty(day)) return false;
+    if (from && d < from) return false;
+    if (to   && d > to)   return false;
+    return true;
+  }).length;
+
+  const periodLabels = { week: 'Cette semaine', month: 'Ce mois', '30': '30 derniers jours', all: 'Tout l\'historique', custom: 'Période personnalisée' };
+
+  const dateFields = period === 'custom' ? `
+  <div class="form-row" style="gap:10px;margin-bottom:14px">
+    <div class="form-group" style="flex:1">
+      <label>Du</label>
+      <input type="date" class="form-input" id="export-from" value="${from || ''}" max="${today}">
+    </div>
+    <div class="form-group" style="flex:1">
+      <label>Au</label>
+      <input type="date" class="form-input" id="export-to" value="${to}" max="${today}">
+    </div>
+  </div>` : `<p style="font-size:13px;color:#888;margin-bottom:16px">${periodLabels[period]} · <strong style="color:#e8e8e8">${count} jour${count>1?'s':''}</strong> journalisé${count>1?'s':''}</p>`;
+
+  const customUpdate = period === 'custom' ? `
+  <button class="sort-btn" style="width:100%;margin-bottom:12px" data-action="refreshExportCount">Calculer</button>` : '';
+
+  return `
+  <h3 class="modal-title">Exporter l'historique</h3>
+  <p style="font-size:12px;color:#666;margin-bottom:12px">${periodLabels[period]}</p>
+  ${dateFields}
+  ${customUpdate}
+  <div style="font-size:12px;color:#666;margin-bottom:10px">Choisir le format</div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:69px">
+    <button class="btn-export" style="text-align:left;padding:12px 14px" data-action="doExport" data-fmt="csv">
+      <span style="font-weight:600">⬇ CSV</span> <span style="color:#666;font-size:12px">— tableur Excel / Numbers</span>
+    </button>
+    <button class="btn-export" style="text-align:left;padding:12px 14px" data-action="doExport" data-fmt="json">
+      <span style="font-weight:600">⬇ JSON</span> <span style="color:#666;font-size:12px">— données complètes structurées</span>
+    </button>
+    <button class="btn-export" style="text-align:left;padding:12px 14px;border-color:rgba(126,184,247,0.2);color:#7eb8f7" data-action="doExport" data-fmt="md">
+      <span style="font-weight:600">🤖 Markdown</span> <span style="color:#666;font-size:12px">— pour analyse IA</span>
+    </button>
+  </div>`;
 }
 
 function renderBurnedInputModal() {
@@ -2169,6 +2224,50 @@ function handleClick(e) {
     case 'exportHistoryCSV':      exportHistoryCSV();      break;
     case 'exportHistoryJSON':     exportHistoryJSON();     break;
     case 'exportHistoryMarkdown': exportHistoryMarkdown(); break;
+
+    case 'refreshExportCount': {
+      const fromVal = document.getElementById('export-from')?.value || null;
+      const toVal   = document.getElementById('export-to')?.value   || todayStr();
+      S.md.from = fromVal;
+      S.md.to   = toVal;
+      render();
+      break;
+    }
+
+    case 'openExportPeriod': {
+      const period = el.dataset.period;
+      const today  = todayStr();
+      let from = null, to = today;
+
+      if (period === 'week') {
+        from = getISOWeek(today).monday;
+      } else if (period === 'month') {
+        from = today.slice(0, 7) + '-01';
+      } else if (period === '30') {
+        const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29);
+        from = d.toISOString().slice(0, 10);
+      } else if (period === 'all') {
+        from = null; // no from = all history
+      }
+      S.modal  = 'exportPeriod';
+      S.md     = { period, from, to: today };
+      render();
+      break;
+    }
+
+    case 'doExport': {
+      const fmt  = el.dataset.fmt;
+      const from = S.md.from || null;
+      const to   = S.md.to   || todayStr();
+      S.modal = null; S.md = {};
+      render();
+      setTimeout(() => {
+        if (fmt === 'csv')      exportHistoryCSV(from, to);
+        else if (fmt === 'json') exportHistoryJSON(from, to);
+        else if (fmt === 'md')   exportHistoryMarkdown(from, to);
+      }, 50);
+      break;
+    }
     case 'exportFoodsCSV':        exportFoodsCSV();        break;
     case 'exportFullJSON':        exportFullJSON();        break;
     // legacy compat
@@ -2757,8 +2856,9 @@ function buildDayExportData(date, day) {
 
 // ── Export CSV Historique (étendu) ────────────────────────────
 
-function exportHistoryCSV() {
-  const today  = todayStr();
+function exportHistoryCSV(from = null, to = null) {
+  const today   = todayStr();
+  const cutTo   = to || today;
   const header = [
     'Date', 'Jour', 'Type', 'Journalise',
     'Kcal_consommees', 'Kcal_objectif', 'Kcal_delta',
@@ -2771,7 +2871,13 @@ function exportHistoryCSV() {
   ];
 
   const rows = Object.entries(S.days)
-    .filter(([date, day]) => date < today && !isDayEmpty(day))  // ← exclut vides et futurs
+    .filter(([date, day]) => {
+      if (date >= today) return false;
+      if (isDayEmpty(day)) return false;
+      if (from && date < from) return false;
+      if (date > cutTo) return false;
+      return true;
+    })
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, day]) => {
       const d = buildDayExportData(date, day);
@@ -2793,17 +2899,25 @@ function exportHistoryCSV() {
     });
 
   const csv = [header.join(','), ...rows].join('\n');
-  download('macros-historique-complet.csv', csv, 'text/csv;charset=utf-8;');
-  showToast(`CSV exporté — ${rows.length} jour(s) journalisés`);
+  const suffix = from ? `_${from}_au_${cutTo}` : '';
+  download(`macros-historique${suffix}.csv`, csv, 'text/csv;charset=utf-8;');
+  showToast(`CSV exporté — ${rows.length} jour(s)`);
 }
 
 // ── Export JSON Historique (étendu) ───────────────────────────
 
-function exportHistoryJSON() {
-  const today = todayStr();
-  // Exclude empty days and today/future
+function exportHistoryJSON(from = null, to = null) {
+  const today  = todayStr();
+  const cutTo  = to || today;
   const sortedDates = Object.keys(S.days)
-    .filter(d => d < today && !isDayEmpty(S.days[d]))
+    .filter(d => {
+      const day = S.days[d];
+      if (d >= today) return false;
+      if (isDayEmpty(day)) return false;
+      if (from && d < from) return false;
+      if (d > cutTo) return false;
+      return true;
+    })
     .sort((a, b) => b.localeCompare(a));
 
   const days = sortedDates.map(date => buildDayExportData(date, S.days[date]));
@@ -2865,19 +2979,27 @@ function exportHistoryJSON() {
     jours: days
   };
 
-  download('macros-historique-complet.json', JSON.stringify(data, null, 2), 'application/json');
-  showToast(`JSON exporté — ${days.length} jour(s) journalisés`);
+  download(`macros-historique${from ? '_'+from+'_au_'+cutTo : '-complet'}.json`, JSON.stringify(data, null, 2), 'application/json');
+  showToast(`JSON exporté — ${days.length} jour(s)`);
 }
 
 // ── Export Markdown (pour analyse IA) ─────────────────────────
 
-function exportHistoryMarkdown() {
-  const today = todayStr();
+function exportHistoryMarkdown(from = null, to = null) {
+  const today  = todayStr();
+  const cutTo  = to || today;
   const sortedDates = Object.keys(S.days)
-    .filter(d => d < today && !isDayEmpty(S.days[d]))
+    .filter(d => {
+      const day = S.days[d];
+      if (d >= today) return false;
+      if (isDayEmpty(day)) return false;
+      if (from && d < from) return false;
+      if (d > cutTo) return false;
+      return true;
+    })
     .sort((a, b) => b.localeCompare(a));
 
-  if (!sortedDates.length) { showToast('Aucun historique journalisé à exporter.'); return; }
+  if (!sortedDates.length) { showToast('Aucun jour journalisé sur cette période.'); return; }
 
   const lines = [];
   lines.push('# Mes Macros — Export Historique Nutritionnel');
@@ -2949,8 +3071,8 @@ function exportHistoryMarkdown() {
     lines.push('');
   }
 
-  download('macros-historique-ia.md', lines.join('\n'), 'text/markdown;charset=utf-8;');
-  showToast(`Markdown exporté — ${sortedDates.length} jour(s) journalisés`);
+  download(`macros-historique${from ? '_'+from+'_au_'+cutTo : '-ia'}.md`, lines.join('\n'), 'text/markdown;charset=utf-8;');
+  showToast(`Markdown exporté — ${sortedDates.length} jour(s)`);
 }
 
 // ── Export CSV Aliments ───────────────────────────────────────

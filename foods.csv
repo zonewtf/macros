@@ -75,7 +75,7 @@ Prozis,Flocons d'avoine,365,12,68,7,
 ,Patate douce (crue),86,1.6,20,0.1,200
 ,Pistaches (sans coque),565,20,20,45,0.7
 ,Pois chiches (sec),350,19,50,6,
-,Pomme de terre (crue),77,2,17,0.1,150
+,Pomme de terre (crue),77,2,17,0.1,
 ,Poulpe cuit,85,18,0,1,
 ,Pâtes Blanches (sec),350,12,72,1.5,
 ,Pâtes Complètes (sec),335,13,65,2.5,
@@ -179,3 +179,11 @@ Coca-cola,Normal,45,0,11.3,0,
 Heinz,Tomato Ketchup,102,1.2,23.2,0.1,
 Lyft,Matcha Latte,115,12,12,2,100
 Bütz,Delicatessen Jambon,140,20,0.8,6.3,75
+Amazon,Protein Shumaï,159,17.6,6.7,7,28
+Amazon,Protein Gyoza,159,18.4,4.2,11.7,24
+Morinaga,Lait Low Fat,43,2.5,5.2,1.3,
+Daizu Labo,PST Soy Meet,116,14.5,9.2,3.4,100
+Welna,Sauce Bolognaise (Pro Taste),70,2.5,10.5,2,130
+Youki,Tteokbokki,224,3.6,48.3,1.8,150
+,Mozzarella,300,17,2,22,
+7-Eleven,Saumon,139,12.4,3.7,8.3,

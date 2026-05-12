@@ -1170,3 +1170,23 @@ h2 {
   color: var(--text3);
 }
 .btn-estimate-sm:active { background: rgba(255,255,255,0.06); }
+
+/* ─── Export period grid ─────────────────────────────────────── */
+.export-period-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.btn-export-period {
+  padding: 11px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  text-align: center;
+  transition: background 0.1s;
+}
+.btn-export-period:active { background: rgba(255,255,255,0.1); color: var(--text); }
