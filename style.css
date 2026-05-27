@@ -1190,3 +1190,10 @@ h2 {
   transition: background 0.1s;
 }
 .btn-export-period:active { background: rgba(255,255,255,0.1); color: var(--text); }
+/* ─── Protein density badge ──────────────────────────────────── */
+.prot-density {
+  color: #666;
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 1px;
+}

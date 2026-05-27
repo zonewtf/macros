@@ -148,6 +148,17 @@ function uid() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 }
 
+// Protein density: % of calories from protein — (P*4/kcal)*100
+function protDensity(kcal, p) {
+  if (!kcal || kcal <= 0) return null;
+  return Math.round((p * 4 / kcal) * 100);
+}
+function protDensityBadge(kcal, p) {
+  const pct = protDensity(kcal, p);
+  if (pct === null) return '';
+  return `<span class="prot-density">${pct}%</span>`;
+}
+
 // #9 — streak: consecutive days with at least 1 food entry
 function getStreak() {
   let streak = 0;
@@ -341,7 +352,7 @@ function renderDayView(date) {
         <div class="entry-left">
           <span class="entry-name">${escHtml(f.name)}</span>
           <div class="entry-macros-row">
-            <span class="entry-macro-p">P ${mc.p}g</span>
+            <span class="entry-macro-p">P ${mc.p}g ${protDensityBadge(mc.kcal, mc.p)}</span>
             <span class="entry-macro-g">G ${mc.g}g</span>
             <span class="entry-macro-l">L ${mc.l}g</span>
           </div>
@@ -759,8 +770,8 @@ function renderFoodsAliments() {
       <div class="food-card-body">
         <div class="food-name">${escHtml(f.name)}</div>
         <div class="food-macros">
-          <span class="food-kcal">${f.kcal} kcal/100g</span>
-          <span style="color:#7eb8f7">P ${f.p}g</span>
+          <span class="food-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
+          <span style="color:#7eb8f7">P ${f.p}g ${protDensityBadge(f.kcal, f.p)}</span>
           <span style="color:#f0c040">G ${f.g}g</span>
           <span style="color:#e87070">L ${f.l}g</span>
           ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
@@ -930,6 +941,16 @@ function renderSettings() {
 
     <div class="settings-block">
       <div class="settings-block-head">
+        <span class="settings-label">Base d'aliments (foods.csv)</span>
+      </div>
+      <p style="font-size:12px;color:#555;margin-bottom:12px;line-height:1.5">
+        Synchronise ta base locale avec le fichier <strong style="color:#888">foods.csv</strong> déployé sur GitHub. Les aliments CSV supprimés ou modifiés seront mis à jour. Tes aliments ajoutés manuellement sont conservés.
+      </p>
+      <button class="btn-confirm" style="margin-bottom:4px;font-size:14px;background:#1a2a1a;color:#66ffaa;border:1px solid rgba(102,255,170,0.2)" data-action="syncCSVNow">🔄 Synchroniser avec foods.csv</button>
+    </div>
+
+    <div class="settings-block">
+      <div class="settings-block-head">
         <span class="settings-label">Sauvegarde iCloud</span>
       </div>
       <p style="font-size:12px;color:#555;margin-bottom:12px;line-height:1.5">
@@ -1020,7 +1041,7 @@ function renderAddFoodModal() {
     const items = list.map(f => `
     <div class="food-item" data-action="selectFood" data-id="${f.id}">
       <span class="food-item-name">${escHtml(f.name)}</span>
-      <span class="food-item-kcal">${f.kcal} kcal/100g</span>
+      <span class="food-item-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
     </div>`).join('');
 
     // Recent foods shown when no query
@@ -1425,7 +1446,7 @@ function renderAddMealModal() {
       <div class="entry-left">
         <span class="entry-name">${escHtml(f.name)}</span>
         <div class="entry-macros-row">
-          <span class="entry-macro-p">P ${+(f.p * it.grams / 100).toFixed(1)}g</span>
+          <span class="entry-macro-p">P ${+(f.p * it.grams / 100).toFixed(1)}g ${protDensityBadge(f.kcal * it.grams / 100, f.p * it.grams / 100)}</span>
           <span class="entry-macro-g">G ${+(f.g * it.grams / 100).toFixed(1)}g</span>
           <span class="entry-macro-l">L ${+(f.l * it.grams / 100).toFixed(1)}g</span>
         </div>
@@ -2203,6 +2224,14 @@ function handleClick(e) {
     }
 
     // ── Backup / Restore
+    case 'syncCSVNow':
+      showToast('Synchronisation en cours…');
+      loadCSVFoods().then(() => {
+        showToast('✅ Base synchronisée avec foods.csv !');
+        render();
+      });
+      break;
+
     case 'backupToiCloud': {
       const now  = new Date();
       const pad  = n => String(n).padStart(2,'0');
@@ -2723,7 +2752,7 @@ function handleInput(e) {
     const items = list.map(f => `
     <div class="food-item" data-action="selectFood" data-id="${f.id}">
       <span class="food-item-name">${escHtml(f.name)}</span>
-      <span class="food-item-kcal">${f.kcal} kcal/100g</span>
+      <span class="food-item-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
     </div>`).join('');
     const addNew = q
       ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
@@ -2751,7 +2780,7 @@ function handleInput(e) {
     <div class="food-card" data-action="editFoodDB" data-id="${f.id}">
       <div class="food-name">${escHtml(f.name)}</div>
       <div class="food-macros">
-        <span class="food-kcal">${f.kcal} kcal/100g</span>
+        <span class="food-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
         <span style="color:#7eb8f7">P ${f.p}g</span>
         <span style="color:#f0c040">G ${f.g}g</span>
         <span style="color:#e87070">L ${f.l}g</span>
@@ -3139,40 +3168,56 @@ function showToast(msg) {
 
 // ── CSV Loader ────────────────────────────────────────────────
 
-async function loadCSVFoods() {
+async function loadCSVFoods(forceSync = false) {
   try {
-    const res = await fetch('./foods.csv');
+    const res = await fetch('./foods.csv?v=' + Date.now()); // cache-bust
     if (!res.ok) return;
     const text = await res.text();
-    const lines = text.trim().split('\n').slice(1); // skip header
-    let added = 0;
+    const lines = text.trim().split('\n').slice(1);
+
+    // Build the set of names that SHOULD exist from the CSV
+    const csvNames = new Set();
+    const csvEntries = [];
     for (const line of lines) {
-      // Handle commas inside quoted fields (basic)
       const cols = line.split(',');
       if (cols.length < 6) continue;
       const [marque, nom, kcal, p, g, l, uw] = cols.map(c => c.trim());
       if (!nom || !kcal) continue;
       const fullName = marque ? `${marque} — ${nom}` : nom;
-      const existing = S.foods.find(f => f.name === fullName);
-      if (existing) {
-        // Already in localStorage — just ensure it's marked as from CSV
-        if (!existing._fromCSV) { existing._fromCSV = true; added++; }
-        continue;
-      }
-      S.foods.push({
-        id:         uid(),
-        name:       fullName,
-        kcal:       +kcal  || 0,
-        p:          +p     || 0,
-        g:          +g     || 0,
-        l:          +l     || 0,
-        unitWeight: uw ? +uw : null,
-        _fromCSV:   true
-      });
-      added++;
+      csvNames.add(fullName);
+      csvEntries.push({ fullName, kcal: +kcal||0, p: +p||0, g: +g||0, l: +l||0, unitWeight: uw ? +uw : null });
     }
-    if (added > 0) {
+
+    // Remove CSV foods that are no longer in the CSV file
+    const before = S.foods.length;
+    S.foods = S.foods.filter(f => {
+      if (!f._fromCSV) return true;       // keep manually added
+      if (f._virtual)  return true;        // keep virtual entries
+      return csvNames.has(f.name);         // keep only if still in CSV
+    });
+    const removed = before - S.foods.length;
+
+    // Add or update foods from CSV
+    let added = 0;
+    for (const entry of csvEntries) {
+      const existing = S.foods.find(f => f.name === entry.fullName);
+      if (existing) {
+        // Update values in case CSV was edited, and ensure flag is set
+        existing.kcal       = entry.kcal;
+        existing.p          = entry.p;
+        existing.g          = entry.g;
+        existing.l          = entry.l;
+        existing.unitWeight = entry.unitWeight;
+        existing._fromCSV   = true;
+      } else {
+        S.foods.push({ id: uid(), name: entry.fullName, kcal: entry.kcal, p: entry.p, g: entry.g, l: entry.l, unitWeight: entry.unitWeight, _fromCSV: true });
+        added++;
+      }
+    }
+
+    if (added > 0 || removed > 0) {
       save();
+      if (removed > 0) console.log(`[Macros] CSV sync: ${removed} aliment(s) supprimé(s), ${added} ajouté(s)`);
     }
   } catch (err) {
     console.warn('[Macros] Impossible de charger foods.csv :', err);
