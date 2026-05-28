@@ -27,6 +27,7 @@ let S = {
   foodsSort:        'alpha',     // #4: 'alpha' | 'used' | 'recent'
   foodsSelect:      false,       // #6: multi-select mode
   foodsSelectedIds: [],          // #6
+  syncWarningDismissed: false,
   collapsedMeals:   {},          // #2: key "date-meal" → true
   settingsEdit:     null,
   settingsTemp:     {},
@@ -148,16 +149,14 @@ function uid() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 }
 
-// Protein density: % of calories from protein — (P*4/kcal)*100
-function protDensity(kcal, p) {
-  if (!kcal || kcal <= 0) return null;
-  return Math.round((p * 4 / kcal) * 100);
-}
-function protDensityBadge(kcal, p) {
-  const pct = protDensity(kcal, p);
-  if (pct === null) return '';
+// Macro density badges: % of total calories from each macro
+function macroPct(kcal, grams, calPerG) {
+  if (!kcal || kcal <= 0) return '';
+  const pct = Math.round((grams * calPerG / kcal) * 100);
   return `<span class="prot-density">${pct}%</span>`;
 }
+// Kept for compatibility
+function protDensityBadge(kcal, p) { return macroPct(kcal, p, 4); }
 
 // #9 — streak: consecutive days with at least 1 food entry
 function getStreak() {
@@ -352,9 +351,9 @@ function renderDayView(date) {
         <div class="entry-left">
           <span class="entry-name">${escHtml(f.name)}</span>
           <div class="entry-macros-row">
-            <span class="entry-macro-p">P ${mc.p}g ${protDensityBadge(mc.kcal, mc.p)}</span>
-            <span class="entry-macro-g">G ${mc.g}g</span>
-            <span class="entry-macro-l">L ${mc.l}g</span>
+            <span class="entry-macro-p">P ${mc.p}g ${macroPct(mc.kcal, mc.p, 4)}</span>
+            <span class="entry-macro-g">G ${mc.g}g ${macroPct(mc.kcal, mc.g, 4)}</span>
+            <span class="entry-macro-l">L ${mc.l}g ${macroPct(mc.kcal, mc.l, 9)}</span>
           </div>
         </div>
         <div class="entry-right">
@@ -734,8 +733,12 @@ function renderFoodsAliments() {
 
   // #1 — banner: manually added foods not in CSV
   const unsynced = S.foods.filter(f => !f._fromCSV).length;
-  const syncBanner = unsynced > 0
-    ? `<div class="sync-warning">⚠️ ${unsynced} aliment${unsynced>1?'s':''} ajouté${unsynced>1?'s':''} manuellement — pense à mettre à jour foods.csv depuis ton ordi</div>`
+  const syncDismissed = S.syncWarningDismissed || false;
+  const syncBanner = (!syncDismissed && unsynced > 0)
+    ? `<div class="sync-warning" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+         <span>⚠️ ${unsynced} aliment${unsynced>1?'s':''} ajouté${unsynced>1?'s':''} manuellement — pense à mettre à jour foods.csv depuis ton ordi</span>
+         <button style="flex-shrink:0;color:#f0c040;font-size:16px;padding:0 4px;background:none;border:none" data-action="dismissSyncWarning">✕</button>
+       </div>`
     : '';
 
   // Filter — search on name only (strip brand prefix), exclude virtual foods
@@ -770,11 +773,10 @@ function renderFoodsAliments() {
       <div class="food-card-body">
         <div class="food-name">${escHtml(f.name)}</div>
         <div class="food-macros">
-          <span class="food-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
-          <span style="color:#7eb8f7">P ${f.p}g ${protDensityBadge(f.kcal, f.p)}</span>
-          <span style="color:#f0c040">G ${f.g}g</span>
-          <span style="color:#e87070">L ${f.l}g</span>
-          ${f.unitWeight ? `<span class="unit-badge">${f.unitWeight}g/u</span>` : ''}
+          <span class="food-kcal">${f.kcal} kcal</span>
+          <span style="color:#7eb8f7">P ${f.p}g ${macroPct(f.kcal, f.p, 4)}</span>
+          <span style="color:#f0c040">G ${f.g}g ${macroPct(f.kcal, f.g, 4)}</span>
+          <span style="color:#e87070">L ${f.l}g ${macroPct(f.kcal, f.l, 9)}</span>
           ${cnt !== null ? `<span class="unit-badge" style="color:#f0c040">${cnt}×</span>` : ''}
         </div>
       </div>
@@ -1041,7 +1043,7 @@ function renderAddFoodModal() {
     const items = list.map(f => `
     <div class="food-item" data-action="selectFood" data-id="${f.id}">
       <span class="food-item-name">${escHtml(f.name)}</span>
-      <span class="food-item-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
+      <span class="food-item-kcal">${f.kcal} kcal</span>
     </div>`).join('');
 
     // Recent foods shown when no query
@@ -1446,9 +1448,9 @@ function renderAddMealModal() {
       <div class="entry-left">
         <span class="entry-name">${escHtml(f.name)}</span>
         <div class="entry-macros-row">
-          <span class="entry-macro-p">P ${+(f.p * it.grams / 100).toFixed(1)}g ${protDensityBadge(f.kcal * it.grams / 100, f.p * it.grams / 100)}</span>
-          <span class="entry-macro-g">G ${+(f.g * it.grams / 100).toFixed(1)}g</span>
-          <span class="entry-macro-l">L ${+(f.l * it.grams / 100).toFixed(1)}g</span>
+          <span class="entry-macro-p">P ${+(f.p * it.grams / 100).toFixed(1)}g ${macroPct(f.kcal * it.grams / 100, f.p * it.grams / 100, 4)}</span>
+          <span class="entry-macro-g">G ${+(f.g * it.grams / 100).toFixed(1)}g ${macroPct(f.kcal * it.grams / 100, f.g * it.grams / 100, 4)}</span>
+          <span class="entry-macro-l">L ${+(f.l * it.grams / 100).toFixed(1)}g ${macroPct(f.kcal * it.grams / 100, f.l * it.grams / 100, 9)}</span>
         </div>
       </div>
       <div class="entry-right">
@@ -2224,6 +2226,11 @@ function handleClick(e) {
     }
 
     // ── Backup / Restore
+    case 'dismissSyncWarning':
+      S.syncWarningDismissed = true;
+      render();
+      break;
+
     case 'syncCSVNow':
       showToast('Synchronisation en cours…');
       loadCSVFoods().then(() => {
@@ -2752,7 +2759,7 @@ function handleInput(e) {
     const items = list.map(f => `
     <div class="food-item" data-action="selectFood" data-id="${f.id}">
       <span class="food-item-name">${escHtml(f.name)}</span>
-      <span class="food-item-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
+      <span class="food-item-kcal">${f.kcal} kcal</span>
     </div>`).join('');
     const addNew = q
       ? `<button class="btn-add-new" data-action="addFoodToDBFromSearch"
@@ -2780,7 +2787,7 @@ function handleInput(e) {
     <div class="food-card" data-action="editFoodDB" data-id="${f.id}">
       <div class="food-name">${escHtml(f.name)}</div>
       <div class="food-macros">
-        <span class="food-kcal">${f.kcal} kcal/100g ${protDensityBadge(f.kcal, f.p)}</span>
+        <span class="food-kcal">${f.kcal} kcal</span>
         <span style="color:#7eb8f7">P ${f.p}g</span>
         <span style="color:#f0c040">G ${f.g}g</span>
         <span style="color:#e87070">L ${f.l}g</span>

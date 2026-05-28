@@ -1,4 +1,4 @@
-const VERSION = 'v36';
+const VERSION = 'v37';
 const CACHE = `macros-${VERSION}`;
 
 const ASSETS = [
