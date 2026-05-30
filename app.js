@@ -152,7 +152,7 @@ function uid() {
 // Macro density badges: % of total calories from each macro
 function macroPct(kcal, grams, calPerG) {
   if (!kcal || kcal <= 0) return '';
-  const pct = Math.round((grams * calPerG / kcal) * 100);
+  const pct = Math.min(99, Math.round((grams * calPerG / kcal) * 100));
   return `<span class="prot-density">${pct}%</span>`;
 }
 // Kept for compatibility
