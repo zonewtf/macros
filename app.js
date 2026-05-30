@@ -760,6 +760,12 @@ function renderFoodsAliments() {
     filtered.sort((a, b) => foodUseCount(b.id) - foodUseCount(a.id));
   } else if (sort === 'recent') {
     filtered.sort((a, b) => (foodLastUsed(b.id)||'').localeCompare(foodLastUsed(a.id)||''));
+  } else if (sort === 'prot') {
+    filtered.sort((a, b) => (b.kcal > 0 ? b.p*4/b.kcal : 0) - (a.kcal > 0 ? a.p*4/a.kcal : 0));
+  } else if (sort === 'gluc') {
+    filtered.sort((a, b) => (b.kcal > 0 ? b.g*4/b.kcal : 0) - (a.kcal > 0 ? a.g*4/a.kcal : 0));
+  } else if (sort === 'lip') {
+    filtered.sort((a, b) => (b.kcal > 0 ? b.l*9/b.kcal : 0) - (a.kcal > 0 ? a.l*9/a.kcal : 0));
   }
 
   const rows = filtered.map(f => {
@@ -815,6 +821,9 @@ function renderFoodsAliments() {
       <button class="sort-btn ${sort==='alpha'  ? 'active':''}" data-action="setFoodsSort" data-val="alpha">A→Z</button>
       <button class="sort-btn ${sort==='used'   ? 'active':''}" data-action="setFoodsSort" data-val="used">+ utilisés</button>
       <button class="sort-btn ${sort==='recent' ? 'active':''}" data-action="setFoodsSort" data-val="recent">Récents</button>
+      <button class="sort-btn ${sort==='prot'   ? 'active':''}" data-action="setFoodsSort" data-val="prot" style="color:#7eb8f7">P%↓</button>
+      <button class="sort-btn ${sort==='gluc'   ? 'active':''}" data-action="setFoodsSort" data-val="gluc" style="color:#f0c040">G%↓</button>
+      <button class="sort-btn ${sort==='lip'    ? 'active':''}" data-action="setFoodsSort" data-val="lip"  style="color:#e87070">L%↓</button>
     </div>
     ${rows || '<p class="empty-state">Aucun aliment.<br>Appuie sur <strong>+ Nouveau</strong> pour commencer !</p>'}
   </div>`;

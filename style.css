@@ -818,7 +818,12 @@ h2 {
 }
 
 /* ─── Sort row (#4) ──────────────────────────────────────────── */
-.sort-row { display:flex; gap:6px; margin-bottom:12px; }
+.sort-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
 .sort-btn {
   flex:1; padding:7px 6px; background:var(--card); border:1px solid var(--border);
   border-radius:10px; font-size:12px; font-weight:500; color:var(--text3); text-align:center;
