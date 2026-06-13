@@ -1202,3 +1202,42 @@ h2 {
   font-weight: 500;
   margin-left: 1px;
 }
+
+/* ─── Water counter ──────────────────────────────────────────── */
+.water-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.water-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.water-btn:active { background: rgba(255,255,255,0.16); }
+.water-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+.water-emoji { font-size: 18px; }
+.water-count { font-size: 22px; font-weight: 700; color: var(--text); }
+.water-label { font-size: 12px; color: var(--text3); }
