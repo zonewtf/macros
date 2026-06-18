@@ -105,8 +105,6 @@ function macroPct(kcal, grams, calPerG) {
   const pct = Math.min(99, Math.round((grams * calPerG / kcal) * 100));
   return `<span class="prot-density">${pct}%</span>`;
 }
-// Kept for compatibility
-function protDensityBadge(kcal, p) { return macroPct(kcal, p, 4); }
 
 // #9 — streak: consecutive days with at least 1 food entry
 function getStreak() {

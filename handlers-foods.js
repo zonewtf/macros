@@ -202,8 +202,6 @@ function handleFoodsAction(a, el, e) {
       render();
       break;
 
-    case 'searchFoods': break;
-
 
     default:
       return false;

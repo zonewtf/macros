@@ -104,7 +104,6 @@ function handleInput(e) {
     S.md.l      = +document.getElementById('db-l')?.value    || null;
     // Only re-render the preview block, not the whole modal (to keep keyboard open)
     const preview = document.querySelector('.calc-preview');
-    const refLabel = document.querySelector('#db-ref-qty');
     // Update labels
     document.querySelectorAll('[id^="db-kcal"], [id^="db-p"], [id^="db-g"], [id^="db-l"]').forEach(inp => {
       const label = inp.closest('.form-group')?.querySelector('label');

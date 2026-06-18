@@ -5,9 +5,7 @@
 //
 // handleSettingsExportAction(a, el, e) retourne true si
 // l'action a été traitée. Voir init.js pour le routeur
-// principal. Inclut aussi les anciens triggers d'export directs
-// (exportHistoryCSV/JSON/Markdown, exportFoodsCSV, exportFullJSON,
-// exportCSV/exportJSON) conservés pour compatibilité.
+// principal.
 // ============================================================
 
 function handleSettingsExportAction(a, el, e) {
@@ -54,12 +52,6 @@ function handleSettingsExportAction(a, el, e) {
       render(); // refresh last-backup label
       break;
     }
-
-    case 'exportHistoryCSV':      exportHistoryCSV();      break;
-
-    case 'exportHistoryJSON':     exportHistoryJSON();     break;
-
-    case 'exportHistoryMarkdown': exportHistoryMarkdown(); break;
 
     case 'refreshExportCount': {
       const fromVal = document.getElementById('export-from')?.value || null;
@@ -108,10 +100,6 @@ function handleSettingsExportAction(a, el, e) {
     case 'exportFoodsCSV':        exportFoodsCSV();        break;
 
     case 'exportFullJSON':        exportFullJSON();        break;
-
-    case 'exportCSV':  exportHistoryCSV(); break;
-
-    case 'exportJSON': exportFullJSON();   break;
 
 
     default:
