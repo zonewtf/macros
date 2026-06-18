@@ -1,10 +1,24 @@
-const VERSION = 'v40';
+const VERSION = 'v41';
 const CACHE = `macros-${VERSION}`;
 
 const ASSETS = [
   './',
   './index.html',
-  './app.js',
+  './state.js',
+  './storage.js',
+  './helpers.js',
+  './render-today.js',
+  './render-history.js',
+  './render-foods.js',
+  './render-settings.js',
+  './render-modals.js',
+  './render-nav.js',
+  './export.js',
+  './handlers-today.js',
+  './handlers-foods.js',
+  './handlers-modals.js',
+  './handlers-settings-export.js',
+  './init.js',
   './style.css',
   './manifest.json',
   './foods.csv',
