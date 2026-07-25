@@ -287,28 +287,37 @@ function exportHistoryMarkdown(from = null, to = null) {
 // ── Export CSV Aliments ───────────────────────────────────────
 
 function exportFoodsCSV() {
-  const header = 'Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire';
+  const header = 'Marque,Nom,Calories,Proteines,Glucides,Lipides,PoidsUnitaire,Utilisations';
   const rows = S.foods
     .filter(f => !f._virtual)
+    .sort((a, b) => foodUseCount(b.id) - foodUseCount(a.id)) // tri par usage décroissant
     .map(f => {
       const sep    = f.name.indexOf(' — ');
       const marque = sep > -1 ? f.name.slice(0, sep) : '';
       const nom    = sep > -1 ? f.name.slice(sep + 3) : f.name;
-      return [marque, nom, f.kcal, f.p, f.g, f.l, f.unitWeight || ''].join(',');
+      const count  = foodUseCount(f.id);
+      return [marque, nom, f.kcal, f.p, f.g, f.l, f.unitWeight || '', count].join(',');
     });
   const csv = [header, ...rows].join('\n');
   download('macros-aliments.csv', csv, 'text/csv;charset=utf-8;');
-  showToast('Aliments CSV exporté !');
+  showToast(`Aliments CSV exporté — ${rows.length} aliment(s)`);
 }
 
 // ── Export JSON Complet ───────────────────────────────────────
 
 function exportFullJSON() {
+  const foods = S.foods
+    .filter(f => !f._virtual)
+    .map(f => ({
+      ...f,
+      utilisations:    foodUseCount(f.id),
+      derniere_utilisation: foodLastUsed(f.id) || null
+    }));
   const data = {
     export_date: new Date().toISOString(),
     app: 'Mes Macros',
     days:  S.days,
-    foods: S.foods,
+    foods,
     meals: S.meals,
     goals: S.goals
   };
