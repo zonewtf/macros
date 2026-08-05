@@ -50,6 +50,36 @@ function handleInput(e) {
     return;
   }
 
+  // Photo picker — compress to 80x80 WebP base64
+  if (el.id === 'db-photo-input' && el.files?.[0]) {
+    const file = el.files[0];
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const SIZE = 80;
+        const canvas = document.createElement('canvas');
+        canvas.width  = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        // Cover crop: center-crop to square then draw at 80x80
+        const side = Math.min(img.width, img.height);
+        const sx   = (img.width  - side) / 2;
+        const sy   = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
+        // WebP at 0.75 quality — ~3-6KB typically
+        const base64 = canvas.toDataURL('image/webp', 0.75);
+        S.md.photo = base64;
+        // Re-render the modal to show preview (keeps all other field values)
+        render();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    el.value = ''; // reset so same file can be picked again
+    return;
+  }
+
   if (a === 'restoreFromFile') {
     const file = el.files?.[0];
     if (!file) return;

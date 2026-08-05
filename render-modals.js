@@ -212,8 +212,20 @@ function renderEditEntryModal() {
 
 function renderAddFoodDBModal() {
   const d = S.md;
+  const photoPreview = d.photo
+    ? `<img src="${d.photo}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px">`
+    : '';
   return `
   <h3 class="modal-title">Nouvel aliment</h3>
+
+  <div class="food-photo-wrap">
+    ${photoPreview}
+    <label class="btn-photo-pick">
+      ${d.photo ? '🔄 Changer la photo' : '📷 Ajouter une photo'}
+      <input type="file" accept="image/*" capture="environment" id="db-photo-input" style="display:none" data-action="pickFoodPhoto">
+    </label>
+  </div>
+
   <div class="form-group">
     <label>Marque (optionnel)</label>
     <input type="text" class="form-input" id="db-brand"
@@ -285,18 +297,35 @@ function renderAddFoodDBModal() {
     <input type="number" class="form-input" id="db-unit"
       value="${d.unitWeight || ''}" placeholder="ex : 120 pour un œuf entier" inputmode="decimal">
   </div>
+  <div class="form-group">
+    <label>Code-barres — optionnel</label>
+    <input type="text" class="form-input" id="db-barcode"
+      value="${escHtml(d.barcode || '')}" placeholder="ex : 8801234567890" inputmode="numeric" autocomplete="off">
+  </div>
   <button class="btn-confirm nav-spacer" data-action="saveFoodDB">Enregistrer dans ma base</button>`;
 }
 
 function renderEditFoodDBModal() {
   const f = S.foods.find(x => x.id === S.md.foodId);
   if (!f) return '<p style="padding:20px;color:#888">Introuvable.</p>';
-  // Extract brand and name (stored as "Marque — Nom" or just "Nom")
   const sep   = f.name.indexOf(' — ');
   const brand = sep > -1 ? f.name.slice(0, sep) : '';
   const nom   = sep > -1 ? f.name.slice(sep + 3) : f.name;
+  const photoPreview = f.photo
+    ? `<img src="${f.photo}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px">`
+    : '';
   return `
   <h3 class="modal-title">Modifier un aliment</h3>
+
+  <div class="food-photo-wrap">
+    ${photoPreview}
+    <label class="btn-photo-pick">
+      ${f.photo ? '🔄 Changer la photo' : '📷 Ajouter une photo'}
+      <input type="file" accept="image/*" capture="environment" id="db-photo-input" style="display:none" data-action="pickFoodPhoto">
+    </label>
+    ${f.photo ? `<button class="btn-photo-remove" data-action="removeFoodPhoto" data-id="${f.id}">✕ Supprimer</button>` : ''}
+  </div>
+
   <div class="form-group">
     <label>Marque (optionnel)</label>
     <input type="text" class="form-input" id="db-brand" value="${escHtml(brand)}" placeholder="ex : Danone, Prozis…" autocomplete="off">
@@ -326,6 +355,11 @@ function renderEditFoodDBModal() {
   <div class="form-group" style="margin-top:4px">
     <label>Poids unitaire (g/unité)</label>
     <input type="number" class="form-input" id="db-unit" value="${f.unitWeight || ''}" inputmode="decimal">
+  </div>
+  <div class="form-group">
+    <label>Code-barres — optionnel</label>
+    <input type="text" class="form-input" id="db-barcode"
+      value="${escHtml(f.barcode || '')}" placeholder="ex : 8801234567890" inputmode="numeric" autocomplete="off">
   </div>
   <div class="modal-edit-actions nav-spacer">
     <button class="btn-delete" data-action="deleteFoodDB" data-id="${f.id}">Supprimer</button>

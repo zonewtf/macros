@@ -63,6 +63,7 @@ function renderFoodsAliments() {
     <div class="food-card ${selMode && isSel ? 'food-card-selected' : ''}"
       data-action="${selMode ? 'toggleSelectFood' : 'editFoodDB'}" data-id="${f.id}">
       ${selMode ? `<span class="food-select-box">${isSel ? '✓' : ''}</span>` : ''}
+      ${f.photo ? `<img src="${f.photo}" class="food-thumb" alt="">` : ''}
       <div class="food-card-body">
         <div class="food-name">${escHtml(f.name)}</div>
         <div class="food-macros">
@@ -71,6 +72,7 @@ function renderFoodsAliments() {
           <span style="color:#f0c040">G ${f.g}g ${macroPct(f.kcal, f.g, 4)}</span>
           <span style="color:#e87070">L ${f.l}g ${macroPct(f.kcal, f.l, 9)}</span>
           ${cnt !== null ? `<span class="unit-badge" style="color:#f0c040">${cnt}×</span>` : ''}
+          ${f.barcode ? `<span class="unit-badge" style="color:#555">🔖 ${f.barcode}</span>` : ''}
         </div>
       </div>
       ${notCSV ? `<button class="btn-not-synced" data-action="showNotSynced" onclick="event.stopPropagation()">

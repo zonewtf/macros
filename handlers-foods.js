@@ -19,6 +19,18 @@
 function handleFoodsAction(a, el, e) {
   switch (a) {
 
+    case 'pickFoodPhoto':
+      // Handled via input change event in init.js
+      break;
+
+    case 'removeFoodPhoto': {
+      const f = S.foods.find(x => x.id === el.dataset.id);
+      if (f) { delete f.photo; save(); }
+      S.modal = 'editFoodDB';
+      render();
+      break;
+    }
+
     case 'openAddFoodDB':
       S.modal = 'addFoodDB';
       S.md    = { calcMode: false };
@@ -50,6 +62,7 @@ function handleFoodsAction(a, el, e) {
       let   g       = +document.getElementById('db-g')?.value    || 0;
       let   l       = +document.getElementById('db-l')?.value    || 0;
       const uw      = +document.getElementById('db-unit')?.value || null;
+      const barcode = document.getElementById('db-barcode')?.value.trim() || null;
       if (!nom)  { showToast('Donne un nom à l\'aliment.'); break; }
       if (!kcal) { showToast('Les calories sont requises.'); break; }
       // If custom qty mode, convert proportionally to per 100g
@@ -61,7 +74,7 @@ function handleFoodsAction(a, el, e) {
         l    = +(l * r).toFixed(1);
       }
       const fullName = brand ? `${brand} — ${nom}` : nom;
-      const food = { id: uid(), name: fullName, kcal, p, g, l, unitWeight: uw || null };
+      const food = { id: uid(), name: fullName, kcal, p, g, l, unitWeight: uw || null, barcode: barcode || null, photo: S.md.photo || null };
       S.foods.push(food);
       save();
       if (S.md.pendingMeal) {
@@ -101,6 +114,8 @@ function handleFoodsAction(a, el, e) {
       f.g          = +document.getElementById('db-g')?.value    || 0;
       f.l          = +document.getElementById('db-l')?.value    || 0;
       f.unitWeight = +document.getElementById('db-unit')?.value || null;
+      f.barcode    = document.getElementById('db-barcode')?.value.trim() || null;
+      if (S.md.photo) f.photo = S.md.photo; // only overwrite if new photo picked this session
       save();
       S.modal = null;
       S.md    = {};
