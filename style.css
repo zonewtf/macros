@@ -198,11 +198,6 @@ h2 {
   color: var(--c, var(--text2));
   border: 1px solid rgba(255,255,255,0.08);
 }
-.pill.pill-over {
-  background: rgba(232,112,112,0.15);
-  color: var(--danger);
-  border-color: rgba(232,112,112,0.3);
-}
 
 /* ─── Meals ──────────────────────────────────────────────────── */
 .meals { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
@@ -220,14 +215,6 @@ h2 {
 }
 .meal-title { font-size: 14px; font-weight: 600; color: var(--text2); }
 
-.btn-add-meal {
-  font-size: 13px;
-  color: var(--accent);
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 8px;
-  background: rgba(200,216,240,0.1);
-}
 .btn-quick-add {
   font-size: 14px;
   padding: 4px 7px;
@@ -236,14 +223,6 @@ h2 {
   color: #f0c040;
 }
 .btn-quick-add:active { background: rgba(240,192,64,0.2); }
-.btn-add-meal-fav {
-  font-size: 14px;
-  padding: 4px 7px;
-  border-radius: 8px;
-  background: rgba(102,255,170,0.08);
-  color: #66ffaa;
-}
-.btn-add-meal-fav:active { background: rgba(102,255,170,0.16); }
 
 /* ─── Sub-tabs ───────────────────────────────────────────────── */
 .subtab-row {
@@ -512,22 +491,6 @@ h2 {
   color: var(--text);
 }
 
-/* Modal search */
-.modal-search-wrap {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.modal-search-wrap .search-input { margin-bottom: 0; flex: 1; }
-.btn-scan {
-  font-size: 22px;
-  padding: 8px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  flex-shrink: 0;
-}
 .food-list {
   max-height: 50vh;
   overflow-y: auto;
@@ -708,34 +671,6 @@ h2 {
 .form-row-3 .form-group label { font-size: 11px; }
 .form-row-3 .form-input { font-size: 14px; padding: 10px 10px; }
 
-/* ─── Scanner overlay ────────────────────────────────────────── */
-.scanner-overlay {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  z-index: 300;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-.scanner-overlay video {
-  width: 100%;
-  max-height: 60vh;
-  object-fit: cover;
-}
-.scanner-overlay p { color: #fff; font-size: 15px; opacity: 0.7; }
-#scan-cancel {
-  padding: 12px 32px;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 14px;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-}
-
 /* ─── Toast ──────────────────────────────────────────────────── */
 .toast {
   position: fixed;
@@ -761,25 +696,6 @@ h2 {
   text-overflow: ellipsis;
 }
 .toast.toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
-/* ─── Copy buttons ───────────────────────────────────────────── */
-.btn-copy-meal {
-  font-size: 14px;
-  padding: 4px 7px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-  color: var(--text2);
-}
-.btn-copy-meal:active { background: rgba(255,255,255,0.12); }
-.btn-copy-day {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-  color: var(--text3);
-  border: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.btn-copy-day:active { background: rgba(255,255,255,0.1); color: var(--text); }
 
 /* ─── Recent foods ───────────────────────────────────────────── */
 .recent-label { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; padding: 8px 0 4px; }
@@ -864,15 +780,6 @@ h2 {
 }
 .meal-chevron.collapsed { transform:rotate(0deg); }
 
-/* ─── History delta (#1) ─────────────────────────────────────── */
-.hist-delta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
 /* ─── Meal header emoji buttons (#2 #3) ─────────────────────── */
 .btn-meal-icon {
   font-size: 15px;
@@ -885,10 +792,7 @@ h2 {
 }
 .btn-meal-icon:active { background: rgba(255,255,255,0.1); }
 /* override old specific classes that set their own backgrounds */
-.btn-meal-icon.btn-quick-add,
-.btn-meal-icon.btn-add-meal-fav,
-.btn-meal-icon.btn-copy-meal,
-.btn-meal-icon.btn-add-meal {
+.btn-meal-icon.btn-quick-add {
   background: none;
   padding: 3px 4px;
   font-size: 15px;
@@ -917,33 +821,6 @@ h2 {
 .btn-ai-prompt:active { background: rgba(255,255,255,0.08); color: var(--text2); }
 
 /* ─── Créatine (#3) ──────────────────────────────────────────── */
-.btn-creatine {
-  display: block;
-  width: 100%;
-  padding: 11px 14px;
-  margin-bottom: 12px;
-  background: rgba(102,255,170,0.06);
-  border: 1px solid rgba(102,255,170,0.2);
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #66ffaa;
-  text-align: center;
-  transition: background 0.15s;
-}
-.btn-creatine:active { background: rgba(102,255,170,0.12); }
-.creatine-taken {
-  display: block;
-  width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  background: rgba(102,255,170,0.04);
-  border: 1px solid rgba(102,255,170,0.12);
-  border-radius: 12px;
-  font-size: 13px;
-  color: #3d9962;
-  text-align: center;
-}
 
 /* ─── Action row créatine + Watch ────────────────────────────── */
 .action-row {
@@ -995,21 +872,6 @@ h2 {
 }
 
 /* ─── Weekly summary card ────────────────────────────────────── */
-.week-summary-card {
-  background: var(--card);
-  border: 1px solid rgba(200,216,240,0.15);
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 12px;
-}
-.week-summary-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text2);
-}
 .week-badges { font-size: 12px; color: var(--text3); }
 
 /* ─── History restructure ────────────────────────────────────── */
@@ -1202,42 +1064,3 @@ h2 {
   font-weight: 500;
   margin-left: 1px;
 }
-
-/* ─── Water counter ──────────────────────────────────────────── */
-.water-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  gap: 12px;
-}
-.water-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: var(--text);
-  font-size: 20px;
-  font-weight: 300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.1s;
-}
-.water-btn:active { background: rgba(255,255,255,0.16); }
-.water-center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: center;
-}
-.water-emoji { font-size: 18px; }
-.water-count { font-size: 22px; font-weight: 700; color: var(--text); }
-.water-label { font-size: 12px; color: var(--text3); }

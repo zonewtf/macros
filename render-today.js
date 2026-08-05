@@ -99,19 +99,6 @@ function renderDayView(date) {
     return `<div class="action-row">${creatinePart}${burnedPart}</div>`;
   })();
 
-  // Compteur d'eau (gourde 600ml)
-  const water = day.water || 0;
-  const waterRow = `
-  <div class="water-row">
-    <button class="water-btn" data-action="changeWater" data-date="${date}" data-d="-1" ${water <= 0 ? 'disabled style="opacity:0.3"' : ''}>−</button>
-    <div class="water-center">
-      <span class="water-emoji">💧</span>
-      <span class="water-count">${water}</span>
-      <span class="water-label">gourde${water !== 1 ? 's' : ''} · ${water * 600} ml</span>
-    </div>
-    <button class="water-btn" data-action="changeWater" data-date="${date}" data-d="1">+</button>
-  </div>`;
-
   // Estimation badge + edit button
   const estimateBadge = isEstimated
     ? `<div class="estimate-banner">
@@ -209,7 +196,6 @@ function renderDayView(date) {
   <div class="view-day">
     ${header}
     ${creatineBtn}
-    ${waterRow}
     ${estimateBadge}
     ${summary}
     ${estimateBtn}

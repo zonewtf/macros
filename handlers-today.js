@@ -256,16 +256,6 @@ function handleTodayAction(a, el, e) {
       break;
     }
 
-    case 'changeWater': {
-      const date = el.dataset.date;
-      const d    = +el.dataset.d;
-      const day  = getDay(date);
-      day.water  = Math.max(0, (day.water || 0) + d);
-      save();
-      render();
-      break;
-    }
-
     case 'takeCreatine': {
       const date = el.dataset.date;
       const day  = getDay(date);

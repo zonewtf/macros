@@ -43,8 +43,6 @@ function buildDayExportData(date, day) {
     type: day.type,
     journalise: isEst ? 'estimé' : (allEntries(day).length > 0 ? 'oui' : 'non'),
     creatine: day.creatine || null,
-    eau_gourdes: day.water || 0,
-    eau_ml: (day.water || 0) * 600,
     calories_depensees_watch: burned,
     deficit_net_kcal: deficit,
     objectifs: { kcal: goals.kcal, p: goals.p, g: goals.g, l: goals.l },
@@ -71,7 +69,6 @@ function exportHistoryCSV(from = null, to = null) {
     'G_g', 'G_objectif', 'G_delta',
     'L_g', 'L_objectif', 'L_delta',
     'Calories_Watch', 'Deficit_net', 'Creatine',
-    'Eau_gourdes', 'Eau_ml',
     'Repas1_kcal','Repas2_kcal','Repas3_kcal','Repas4_kcal','Repas5_kcal',
     'Repas6_kcal','Repas7_kcal','Repas8_kcal','Repas9_kcal','Repas10_kcal'
   ];
@@ -100,8 +97,6 @@ function exportHistoryCSV(from = null, to = null) {
         d.calories_depensees_watch ?? '',
         d.deficit_net_kcal ?? '',
         d.creatine ? 'Oui' : 'Non',
-        d.eau_gourdes,
-        d.eau_ml,
         ...mKcal
       ].join(',');
     });
@@ -265,7 +260,6 @@ function exportHistoryMarkdown(from = null, to = null) {
       lines.push(`**Watch :** ${d.calories_depensees_watch} kcal → ${def > 0 ? 'Déficit −'+def : 'Surplus +'+Math.abs(def)} kcal`);
     }
     if (d.creatine) lines.push(`**Créatine :** prise à ${d.creatine} 💪🏼`);
-    if (d.eau_gourdes) lines.push(`**Eau :** ${d.eau_gourdes} gourde${d.eau_gourdes > 1 ? 's' : ''} · ${d.eau_ml} ml 💧`);
 
     if (isEst) {
       lines.push(`*Journée estimée globalement — pas de détail par repas*`);
