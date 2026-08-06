@@ -1067,11 +1067,12 @@ h2 {
 
 /* ─── Food photo ─────────────────────────────────────────────── */
 .food-thumb {
-  width: 52px;
-  height: 52px;
+  width: 26px;
+  height: 26px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 6px;
   flex-shrink: 0;
+  cursor: pointer;
 }
 .food-card {
   display: flex;

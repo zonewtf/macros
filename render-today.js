@@ -146,6 +146,7 @@ function renderDayView(date) {
         : `${e.grams}g`;
       const mc = calcMacros([e]);
       return `<div class="meal-entry" data-action="editEntry" data-meal="${m}" data-idx="${i}" data-date="${date}">
+        ${f.photo ? `<img src="${f.photo}" class="food-thumb" alt="" data-action="viewPhoto" data-src="${f.photo}" onclick="event.stopPropagation()">` : ''}
         <div class="entry-left">
           <span class="entry-name">${escHtml(f.name)}</span>
           <div class="entry-macros-row">

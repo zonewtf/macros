@@ -43,7 +43,7 @@ function renderAddFoodModal() {
   if (!sel) {
     // Search view
     const list = q.length >= 1
-      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()) || (f.barcode && f.barcode.includes(q)))
       : S.foods.slice().sort((a, b) => a.name.localeCompare(b, 'fr'));
 
     const items = list.map(f => `

@@ -38,7 +38,7 @@ function handleInput(e) {
     S.md.mealSearchQ = el.value;
     const q = S.md.mealSearchQ;
     const searchList = q.length >= 1
-      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8)
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()) || (f.barcode && f.barcode.includes(q))).slice(0, 8)
       : [];
     const searchItems = searchList.map(f => `
       <div class="food-item" data-action="selectMealIngredient" data-id="${f.id}">
@@ -174,7 +174,7 @@ function handleInput(e) {
     const q   = S.searchQ;
     // Re-render food list without full render to keep keyboard open
     const list = q.length >= 1
-      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()) || (f.barcode && f.barcode.includes(q)))
       : S.foods.slice().sort((a, b) => a.name.localeCompare(b, 'fr'));
     const items = list.map(f => `
     <div class="food-item" data-action="selectFood" data-id="${f.id}">
@@ -200,7 +200,7 @@ function handleInput(e) {
     // Re-render only the food list section
     const q = S.foodsSearch;
     const filtered = q.length > 0
-      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()))
+      ? S.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()) || (f.barcode && f.barcode.includes(q)))
       : [...S.foods];
     filtered.sort((a, b) => a.name.localeCompare(b, 'fr'));
     const rows = filtered.map(f => `
