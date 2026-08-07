@@ -63,7 +63,7 @@ function renderFoodsAliments() {
     <div class="food-card ${selMode && isSel ? 'food-card-selected' : ''}"
       data-action="${selMode ? 'toggleSelectFood' : 'editFoodDB'}" data-id="${f.id}">
       ${selMode ? `<span class="food-select-box">${isSel ? '✓' : ''}</span>` : ''}
-      ${f.photo ? `<img src="${f.photo}" class="food-thumb" alt="" data-action="viewPhoto" data-src="${f.photo}" onclick="event.stopPropagation()">` : ''}
+      ${f.photo ? `<img src="${f.photo}" class="food-thumb js-view-photo" alt="">` : ''}
       <div class="food-card-body">
         <div class="food-name">${escHtml(f.name)}</div>
         <div class="food-macros">

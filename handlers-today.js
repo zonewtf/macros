@@ -11,17 +11,6 @@
 function handleTodayAction(a, el, e) {
   switch (a) {
 
-    case 'viewPhoto': {
-      const src = el.dataset.src;
-      if (!src) break;
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:999;display:flex;align-items:center;justify-content:center;cursor:pointer';
-      overlay.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain">`;
-      overlay.addEventListener('click', () => overlay.remove());
-      document.body.appendChild(overlay);
-      break;
-    }
-
     case 'toggleWeek': {
       const key = el.dataset.key;
       // false = explicitly expanded, delete key = back to default (collapsed)

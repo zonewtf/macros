@@ -267,6 +267,21 @@ function bindEvents() {
   const app = document.getElementById('app');
   app.addEventListener('click', handleClick);
   app.addEventListener('input', handleInput);
+
+  // Photo viewer — delegated on class .js-view-photo
+  // Uses capture phase so it runs before the parent card's click handler
+  app.addEventListener('click', e => {
+    const img = e.target.closest('.js-view-photo');
+    if (!img) return;
+    e.stopPropagation();
+    const src = img.src;
+    if (!src) return;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+    overlay.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain">`;
+    overlay.addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
+  }, true); // capture: true → runs before bubbling phase → stopPropagation works
 }
 
 // ── Toast ─────────────────────────────────────────────────────
