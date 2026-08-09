@@ -57,18 +57,18 @@ function handleInput(e) {
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const SIZE = 80;
+        const SIZE = 200;
         const canvas = document.createElement('canvas');
         canvas.width  = SIZE;
         canvas.height = SIZE;
         const ctx = canvas.getContext('2d');
-        // Cover crop: center-crop to square then draw at 80x80
+        // Cover crop: center-crop to square then draw at 200x200
         const side = Math.min(img.width, img.height);
         const sx   = (img.width  - side) / 2;
         const sy   = (img.height - side) / 2;
         ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
-        // WebP at 0.75 quality — ~3-6KB typically
-        const base64 = canvas.toDataURL('image/webp', 0.75);
+        // WebP at 0.88 quality — ~20-40KB typically
+        const base64 = canvas.toDataURL('image/webp', 0.88);
         S.md.photo = base64;
         // Re-render the modal to show preview (keeps all other field values)
         render();
